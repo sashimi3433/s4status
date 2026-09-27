@@ -1,57 +1,62 @@
-/** Legal pages (bilingual JA + EN), served by the worker at /privacy and /terms. */
+/** Legal pages (Japanese), served by the worker at /privacy and /terms.
+ *  Follows the site theme (s4status-theme localStorage / ?theme= / system). */
+
+// Same pre-paint theme resolution as index.html
+const THEME_SCRIPT = `<script>
+(() => {
+  try {
+    const q = new URLSearchParams(location.search).get("theme");
+    const mode = q || localStorage.getItem("s4status-theme") || "system";
+    const dark =
+      mode === "dark" ||
+      (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (dark) document.documentElement.classList.add("dark");
+  } catch {}
+})();
+</script>`;
 
 const CSS = `
-  :root { color-scheme: light dark; }
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
   body {
-    margin: 0; background: #09090b; color: #e4e4e7;
+    margin: 0; background: #fafafa; color: #27272a;
     font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", "Noto Sans JP", sans-serif;
-    line-height: 1.75; font-size: 15px;
+    line-height: 1.8; font-size: 15px;
   }
-  @media (prefers-color-scheme: light) {
-    body { background: #fafafa; color: #27272a; }
-    a { color: #059669; }
-    .card { background: #fff; border-color: #e4e4e7; }
-    h1, h2 { color: #09090b; }
-    .meta { color: #71717a; }
-    hr { border-color: #e4e4e7; }
-  }
-  a { color: #34d399; }
-  h1 { font-size: 1.6rem; color: #fafafa; margin: 0 0 .25rem; }
-  h2 { font-size: 1.05rem; color: #e4e4e7; margin: 2rem 0 .5rem; }
+  a { color: #059669; }
+  h1 { font-size: 1.6rem; color: #09090b; margin: 0 0 .25rem; }
+  h2 { font-size: 1.05rem; color: #18181b; margin: 2rem 0 .5rem; }
   p { margin: .6rem 0; }
-  .card { max-width: 46rem; margin: 2.5rem auto; padding: 2.5rem 1.75rem; background: #101014; border: 1px solid #27272a; border-radius: 12px; }
-  .meta { color: #a1a1aa; font-size: .85rem; }
+  .card { max-width: 46rem; margin: 2.5rem auto; padding: 2.5rem 1.75rem; background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; }
+  .meta { color: #71717a; font-size: .85rem; }
   nav.top { margin-bottom: 1.5rem; font-size: .85rem; }
-  hr { border: none; border-top: 1px solid #27272a; margin: 3rem 0; }
   ul { padding-left: 1.2rem; margin: .5rem 0; }
-  .en { opacity: .92; }
+  html.dark body { background: #09090b; color: #e4e4e7; }
+  html.dark a { color: #34d399; }
+  html.dark h1 { color: #fafafa; }
+  html.dark h2 { color: #e4e4e7; }
+  html.dark .card { background: #101014; border-color: #27272a; }
+  html.dark .meta { color: #a1a1aa; }
 `;
 
-function layout(langJaTitle: string, enTitle: string, bodyJa: string, bodyEn: string): string {
+function layout(title: string, body: string): string {
   return `<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${langJaTitle}・${enTitle} — MEGA S4 Status</title>
-  <meta name="description" content="${langJaTitle} / ${enTitle} — MEGA S4 Status (unofficial)" />
+  <title>${title} — MEGA S4 Status (unofficial)</title>
+  <meta name="description" content="${title} — MEGA S4 Status(非公式)" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  ${THEME_SCRIPT}
   <style>${CSS}</style>
 </head>
 <body>
 <main class="card">
   <nav class="top"><a href="/">← MEGA S4 Status</a></nav>
-  <section lang="ja">
-    <h1>${langJaTitle}</h1>
-    <p class="meta">制定: 2026年9月28日 — MEGA S4 Status (unofficial)</p>
-    ${bodyJa}
-  </section>
-  <hr />
-  <section lang="en" class="en">
-    <h1>${enTitle}</h1>
-    <p class="meta">Effective: September 28, 2026 — MEGA S4 Status (unofficial)</p>
-    ${bodyEn}
-  </section>
+  <h1>${title}</h1>
+  <p class="meta">制定: 2026年9月28日 — MEGA S4 Status (unofficial)</p>
+  ${body}
 </main>
 </body>
 </html>`;
@@ -82,32 +87,6 @@ const PRIVACY_JA = `
   <h2>7. ポリシーの変更</h2>
   <p>本ポリシーは、必要に応じて変更することがあります。変更後の本ページへの掲載をもって効力が生じるものとします。</p>
   <h2>8. お問い合わせ</h2>
-  <p>contact@sessapps.com</p>`;
-
-const PRIVACY_EN = `
-  <h2>1. Information We Collect</h2>
-  <ul>
-    <li><strong>Email address</strong> — provided voluntarily when subscribing to incident notifications.</li>
-    <li><strong>IP addresses</strong> — processed transiently to enforce the API rate limit (100 requests/minute). Not permanently stored.</li>
-    <li><strong>Display preferences (theme, language)</strong> — stored in your browser's localStorage; never sent to our servers.</li>
-    <li><strong>Access logs</strong> — this site runs on Cloudflare, which records standard request logs (IP address, user agent, timestamps). See Cloudflare's privacy policy for details.</li>
-  </ul>
-  <h2>2. Purpose of Use</h2>
-  <ul>
-    <li>Sending incident notification emails (if subscribed)</li>
-    <li>Fair operation of the service (rate limiting, abuse prevention)</li>
-  </ul>
-  <h2>3. Cookies &amp; Local Storage</h2>
-  <p>We do not use tracking or analytics cookies. Only theme and language preferences are stored in localStorage, which you can clear at any time.</p>
-  <h2>4. Third-Party Disclosure</h2>
-  <p>We do not sell or share your email address with third parties, except where required by law, or with an email delivery provider strictly for sending the notifications you requested.</p>
-  <h2>5. Storage &amp; Deletion</h2>
-  <p>Subscription records (email, settings, management token) are stored in a Cloudflare D1 database. Unsubscribing (via the website, email link, or API) deletes the record immediately.</p>
-  <h2>6. Your Rights</h2>
-  <p>You can view or delete your subscription via the unsubscribe page, the API (<code>/api/subscriptions</code>, <code>/api/unsubscribe</code>), or by contacting contact@sessapps.com.</p>
-  <h2>7. Changes to This Policy</h2>
-  <p>This policy may be updated from time to time. Updates take effect when published on this page.</p>
-  <h2>8. Contact</h2>
   <p>contact@sessapps.com</p>`;
 
 const TERMS_JA = `
@@ -141,41 +120,10 @@ const TERMS_JA = `
   <h2>12. お問い合わせ</h2>
   <p>contact@sessapps.com</p>`;
 
-const TERMS_EN = `
-  <h2>1. The Service</h2>
-  <p>This service is an unofficial status monitor (website, public API, and notification emails) for MEGA S4 (S3-compatible object storage) and its IAM API.</p>
-  <h2>2. Unofficial Nature</h2>
-  <p>This service is not affiliated with MEGA or its affiliates, and does not replace or warrant official status information.</p>
-  <h2>3. No Warranty</h2>
-  <p>The service is provided "as is", without warranty of any kind regarding the accuracy, completeness, availability, or fitness for a particular purpose of the displayed statuses.</p>
-  <h2>4. Monitoring Limitations</h2>
-  <p>Statuses are checked at 5-minute intervals. Incidents may be detected late or not at all.</p>
-  <h2>5. API Use</h2>
-  <p>The public API requires no authentication and is rate limited to 100 requests/minute/IP. We may restrict abuse, change the API, or discontinue it without notice.</p>
-  <h2>6. Notification Emails</h2>
-  <p>Notifications may be delayed or missed. Always verify with official sources before making critical decisions.</p>
-  <h2>7. Prohibited Conduct</h2>
-  <ul>
-    <li>Unauthorized access or attempts thereof</li>
-    <li>Circumventing rate limits or excessive requests</li>
-    <li>Interfering with the operation of the service</li>
-    <li>Any use that violates applicable law</li>
-  </ul>
-  <h2>8. Limitation of Liability</h2>
-  <p>The operator is not liable for any direct or indirect damages arising from the use of, or inability to use, this service.</p>
-  <h2>9. Changes &amp; Termination</h2>
-  <p>The service may be modified or discontinued at any time without notice.</p>
-  <h2>10. Governing Law</h2>
-  <p>These terms are governed by the laws of Japan.</p>
-  <h2>11. Changes to These Terms</h2>
-  <p>These terms may be updated from time to time; updates take effect when published on this page.</p>
-  <h2>12. Contact</h2>
-  <p>contact@sessapps.com</p>`;
-
 export function privacyPage(): string {
-  return layout("プライバシーポリシー", "Privacy Policy", PRIVACY_JA, PRIVACY_EN);
+  return layout("プライバシーポリシー", PRIVACY_JA);
 }
 
 export function termsPage(): string {
-  return layout("利用規約", "Terms of Service", TERMS_JA, TERMS_EN);
+  return layout("利用規約", TERMS_JA);
 }
