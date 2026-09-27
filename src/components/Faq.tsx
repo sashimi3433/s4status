@@ -1,11 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useI18n } from "../lib/i18n";
 
+/** Linkify the "/docs" mention in FAQ answers to the API documentation. */
+function LinkifiedAnswer({ text, docsHref }: { text: string; docsHref: string }) {
+  const parts = text.split("/docs");
+  if (parts.length === 1) return <>{text}</>;
+  return (
+    <>
+      {parts.map((p, i) => (
+        <Fragment key={i}>
+          {i > 0 && (
+            <a
+              href={docsHref}
+              className="font-medium text-emerald-600 underline underline-offset-2 transition hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
+            >
+              /docs
+            </a>
+          )}
+          {p}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 export default function Faq() {
-  const { t, faq } = useI18n();
+  const { t, faq, lang } = useI18n();
   const [open, setOpen] = useState<number | null>(0);
   const headerRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const rafRef = useRef<number | null>(null);
+  const docsHref = lang === "en" ? "/docs" : `/docs?lang=${lang}`;
 
   useEffect(
     () => () => {
@@ -86,7 +110,7 @@ export default function Faq() {
               >
                 <div className="overflow-hidden">
                   <p className="px-4 pb-4 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400 sm:px-5">
-                    {item.a}
+                    <LinkifiedAnswer text={item.a} docsHref={docsHref} />
                   </p>
                 </div>
               </div>
