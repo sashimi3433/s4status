@@ -8,6 +8,7 @@ import Timeline from "./components/Timeline";
 import Faq from "./components/Faq";
 import SubscribeForm from "./components/SubscribeForm";
 import Footer from "./components/Footer";
+import { Privacy, Terms } from "./components/Legal";
 import { addDays, currentSlotOf, toDateStr, type StatusCode } from "./data/mock";
 
 export default function App() {
@@ -15,6 +16,8 @@ export default function App() {
   const [lastChecked] = useState(() => new Date());
   const [selectedEndpoint, setSelectedEndpoint] = useState("all");
   const [selectedDate, setSelectedDate] = useState(() => toDateStr(new Date()));
+  // Minimal path routing for the legal pages (everything else is query-param based)
+  const [path] = useState(() => location.pathname);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
@@ -57,25 +60,33 @@ export default function App() {
     <div className="min-h-screen">
       <Header overall={overall} />
       <main className="pb-4">
-        <OverallStats
-          statuses={statuses}
-          uptimes={uptimes}
-          lastChecked={lastChecked}
-          now={now}
-          selected={selectedEndpoint}
-          onSelect={selectEndpoint}
-        />
-        <Timeline
-          selectedEndpoint={selectedEndpoint}
-          onSelectEndpoint={setSelectedEndpoint}
-          date={selectedDate}
-          onDateChange={setSelectedDate}
-          minDate={minDate}
-          todayStr={todayStr}
-          currentSlot={currentSlot}
-        />
-        <Faq />
-        <SubscribeForm />
+        {path === "/privacy" ? (
+          <Privacy />
+        ) : path === "/terms" ? (
+          <Terms />
+        ) : (
+          <>
+            <OverallStats
+              statuses={statuses}
+              uptimes={uptimes}
+              lastChecked={lastChecked}
+              now={now}
+              selected={selectedEndpoint}
+              onSelect={selectEndpoint}
+            />
+            <Timeline
+              selectedEndpoint={selectedEndpoint}
+              onSelectEndpoint={setSelectedEndpoint}
+              date={selectedDate}
+              onDateChange={setSelectedDate}
+              minDate={minDate}
+              todayStr={todayStr}
+              currentSlot={currentSlot}
+            />
+            <Faq />
+            <SubscribeForm />
+          </>
+        )}
       </main>
       <Footer />
     </div>
