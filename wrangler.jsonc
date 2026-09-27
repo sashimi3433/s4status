@@ -7,6 +7,7 @@
   // Static SPA served from Cloudflare Workers.
   // The build output is wired up automatically by @cloudflare/vite-plugin.
   "assets": {
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS"
   }
 }
