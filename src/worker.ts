@@ -221,6 +221,16 @@ function docsPage(lang: string | null): Response {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MEGA S4 Status API — Scalar</title>
   <meta name="description" content="API reference for the MEGA S4 Status API (unofficial)" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="MEGA S4 Status" />
+  <meta property="og:title" content="MEGA S4 Status API (unofficial)" />
+  <meta property="og:description" content="Public status API for MEGA S4 and its IAM API — no auth, 100 requests/minute. Interactive documentation." />
+  <meta property="og:url" content="https://s4status.sessapps.com/docs" />
+  <meta property="og:image" content="https://s4status.sessapps.com/ogp.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="MEGA S4 Status API (unofficial)" />
+  <meta name="twitter:description" content="Public status API for MEGA S4 and its IAM API — no auth, 100 requests/minute." />
+  <meta name="twitter:image" content="https://s4status.sessapps.com/ogp.png" />
   <style>body { margin: 0; }</style>
 </head>
 <body>
