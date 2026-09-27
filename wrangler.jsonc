@@ -19,6 +19,6 @@
     "binding": "ASSETS",
     // Serve the API and docs from the worker before asset lookup; otherwise
     // SPA fallback emulation intercepts navigations to /docs in dev.
-    "run_worker_first": ["/api/*", "/docs", "/docs/*", "/robots.txt"]
+    "run_worker_first": ["/api/*", "/docs", "/docs/*", "/privacy", "/terms", "/robots.txt"]
   }
 }

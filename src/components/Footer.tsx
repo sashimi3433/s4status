@@ -10,6 +10,14 @@ export default function Footer() {
             © {new Date().getFullYear()} MEGA S4 Status (unofficial) · {t("footer.poweredBy")}
           </p>
           <p className="max-w-xl leading-relaxed">{t("footer.disclaimer")}</p>
+          <p className="flex gap-4 pt-1">
+            <a className="hover:text-zinc-800 dark:hover:text-zinc-200" href="/privacy">
+              {t("footer.privacy")}
+            </a>
+            <a className="hover:text-zinc-800 dark:hover:text-zinc-200" href="/terms">
+              {t("footer.terms")}
+            </a>
+          </p>
         </div>
         <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row sm:gap-4 sm:self-center">
           <a

@@ -75,6 +75,8 @@ const ja = {
   "footer.disclaimer":
     "本サイトは MEGA S4 の非公式ステータスモニタです。MEGA / MEGA S4 とは無関係であり、公式のステータス情報ではありません。",
   "footer.poweredBy": "Cloudflare Workers で配信",
+  "footer.privacy": "プライバシーポリシー",
+  "footer.terms": "利用規約",
   "region.Luxembourg": "ルクセンブルク",
   "region.Amsterdam": "アムステルダム",
   "region.Paris": "パリ",
@@ -143,6 +145,8 @@ const en = {
   "footer.disclaimer":
     "This is an unofficial status monitor for MEGA S4. It is not affiliated with MEGA and is not an official source of status information.",
   "footer.poweredBy": "Served by Cloudflare Workers",
+  "footer.privacy": "Privacy Policy",
+  "footer.terms": "Terms of Service",
   "region.Luxembourg": "Luxembourg",
   "region.Amsterdam": "Amsterdam",
   "region.Paris": "Paris",
@@ -211,6 +215,8 @@ const zh = {
   "footer.disclaimer":
     "本网站是非官方的 MEGA S4 状态监控页面,与 MEGA 无关,也不代表官方状态信息。",
   "footer.poweredBy": "由 Cloudflare Workers 提供服务",
+  "footer.privacy": "隐私政策",
+  "footer.terms": "服务条款",
   "region.Luxembourg": "卢森堡",
   "region.Amsterdam": "阿姆斯特丹",
   "region.Paris": "巴黎",
@@ -279,6 +285,8 @@ const ko = {
   "footer.disclaimer":
     "본 사이트는 MEGA S4의 비공식 상태 모니터이며 MEGA와 무관하고 공식 상태 정보가 아닙니다.",
   "footer.poweredBy": "Cloudflare Workers로 제공",
+  "footer.privacy": "개인정보 처리방침",
+  "footer.terms": "이용약관",
   "region.Luxembourg": "룩셈부르크",
   "region.Amsterdam": "암스테르담",
   "region.Paris": "파리",
@@ -347,6 +355,8 @@ const es = {
   "footer.disclaimer":
     "Este es un monitor de estado no oficial de MEGA S4. No está afiliado a MEGA y no es una fuente oficial de información de estado.",
   "footer.poweredBy": "Servido por Cloudflare Workers",
+  "footer.privacy": "Política de privacidad",
+  "footer.terms": "Términos del servicio",
   "region.Luxembourg": "Luxemburgo",
   "region.Amsterdam": "Ámsterdam",
   "region.Paris": "París",
@@ -415,6 +425,8 @@ const fr = {
   "footer.disclaimer":
     "Ceci est un moniteur d'état non officiel de MEGA S4. Il n'est pas affilié à MEGA et ne remplace pas les informations officielles.",
   "footer.poweredBy": "Propulsé par Cloudflare Workers",
+  "footer.privacy": "Politique de confidentialité",
+  "footer.terms": "Conditions d'utilisation",
   "region.Luxembourg": "Luxembourg",
   "region.Amsterdam": "Amsterdam",
   "region.Paris": "Paris",
@@ -483,6 +495,8 @@ const de = {
   "footer.disclaimer":
     "Dies ist ein inoffizieller Statusmonitor für MEGA S4. Er steht in keiner Verbindung zu MEGA und ist keine offizielle Statusquelle.",
   "footer.poweredBy": "Bereitgestellt über Cloudflare Workers",
+  "footer.privacy": "Datenschutzerklärung",
+  "footer.terms": "Nutzungsbedingungen",
   "region.Luxembourg": "Luxemburg",
   "region.Amsterdam": "Amsterdam",
   "region.Paris": "Paris",
@@ -551,6 +565,8 @@ const nl = {
   "footer.disclaimer":
     "Dit is een niet-officiële statusmonitor voor MEGA S4. Deze is niet verbonden met MEGA en is geen officiële bron van statusinformatie.",
   "footer.poweredBy": "Aangeboden door Cloudflare Workers",
+  "footer.privacy": "Privacybeleid",
+  "footer.terms": "Gebruiksvoorwaarden",
   "region.Luxembourg": "Luxemburg",
   "region.Amsterdam": "Amsterdam",
   "region.Paris": "Parijs",
