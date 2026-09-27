@@ -8,6 +8,9 @@
   // The build output is wired up automatically by @cloudflare/vite-plugin.
   "assets": {
     "not_found_handling": "single-page-application",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    // Serve the API and docs from the worker before asset lookup; otherwise
+    // SPA fallback emulation intercepts navigations to /docs in dev.
+    "run_worker_first": ["/api/*", "/docs", "/docs/*"]
   }
 }
