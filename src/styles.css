@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-ok: #10b981;
+  --color-ok-dark: #34d399;
+  --color-degraded: #f59e0b;
+  --color-outage: #ef4444;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+  }
+
+  /* NOTE: do NOT add a global `body *` color transition here — this page has
+     ~10k DOM nodes (uptime bars) and animating background-color on all of
+     them makes theme switching extremely janky. Theme switches are smoothed
+     with the View Transitions API in lib/theme.tsx instead. */
+
+  ::selection {
+    @apply bg-emerald-500/25;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Entrance / micro animations.
+ * Keyframes define only the "from" state; "to" is the element's own style,
+ * so fill-mode "backwards" never pins a transform that would block
+ * Tailwind hover transforms after the animation ends.
+ * ------------------------------------------------------------------------- */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+/* Glass-light sweep that follows the bar cascade across each row */
+@keyframes bar-sheen {
+  0% {
+    transform: translateX(-130%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(130%);
+    opacity: 1;
+  }
+}
+/* Bars pop in one by one (day view: 2ms stagger, hour view: 35ms) */
+@keyframes slot-pop {
+  from {
+    opacity: 0;
+    transform: scaleY(0.1);
+  }
+}
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  70% {
+    transform: scale(1.12);
+  }
+}
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+/* Ends at the tooltip's inline transform (translate(-50%,-100%)) */
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -92%) scale(0.96);
+  }
+}
+
+.anim-fade-up {
+  animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.anim-fade-down {
+  animation: fade-down 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.anim-fade-in {
+  animation: fade-in 0.35s ease backwards;
+}
+/* Day view only: sheen rides the row right after its bar cascade; opacity 0
+   at rest so the gradient band is invisible once the sweep finishes. */
+.anim-row-sheen {
+  position: relative;
+}
+.anim-row-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 70%
+  );
+  animation: bar-sheen 0.8s ease calc(var(--rd, 0ms) + 1000ms) backwards;
+}
+.anim-slot-pop {
+  animation: slot-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Hold the timeline cascade until it scrolls into view; Timeline.tsx removes
+   this class via IntersectionObserver. Paused also freezes the delay phase,
+   so bars stay invisible and the stagger starts on release. */
+.anim-hold .anim-slot-pop,
+.anim-hold .anim-row-sheen::after {
+  animation-play-state: paused;
+}
+.anim-pop-in {
+  animation: pop-in 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+}
+.anim-slide-down {
+  animation: slide-down 0.3s ease backwards;
+}
+.anim-tooltip {
+  animation: tooltip-in 0.16s ease backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

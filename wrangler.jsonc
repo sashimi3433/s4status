@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "s4status",
+  "compatibility_date": "2026-09-25",
+  // Static SPA served from Cloudflare Workers.
+  // The build output is wired up automatically by @cloudflare/vite-plugin.
+  "assets": {
+    "not_found_handling": "single-page-application"
+  }
+}
