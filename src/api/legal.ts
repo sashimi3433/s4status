@@ -34,7 +34,7 @@ function layout(langJaTitle: string, enTitle: string, bodyJa: string, bodyEn: st
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${langJaTitle}・${enTitle} — MEGA S4 Status</title>
-  <meta name="robots" content="noindex, follow" />
+  <meta name="description" content="${langJaTitle} / ${enTitle} — MEGA S4 Status (unofficial)" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>${CSS}</style>
 </head>
