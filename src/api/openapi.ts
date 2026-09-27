@@ -20,6 +20,18 @@ interface SpecStrings {
   timelineDesc: string;
   subscribeSummary: string;
   subscribeDesc: string;
+  reqRegions: string;
+  reqEndpoints: string;
+  respUpdated: string;
+  subGetSummary: string;
+  subGetDesc: string;
+  subDeleteSummary: string;
+  subDeleteDesc: string;
+  unsubSummary: string;
+  unsubDesc: string;
+  paramEmail: string;
+  paramToken: string;
+  resp404: string;
   paramDate: string;
   paramEndpoint: string;
   paramHour: string;
@@ -71,8 +83,27 @@ const EN: SpecStrings = {
     "`uptime` is the operational share of the measured slots in the returned window.",
   subscribeSummary: "Subscribe an email address to incident notifications",
   subscribeDesc:
-    "Registers an email address for MEGA S4 / IAM incident notifications. " +
-    "Choose one or both services.",
+    "Creates a subscription, or **updates it when the same email address is submitted again** " +
+    "(the email address is the record ID). Filter notifications by `services` and/or " +
+    "`regions` / `endpoints` (omit or `all` for everything). " +
+    "Notification emails carry RFC 2369 `List-Unsubscribe` (and `List-Unsubscribe-Post: One-Click`) " +
+    "headers pointing to `subscription.unsubscribeUrl`.",
+  reqRegions: "Region IDs to notify (e.g. `ap-tokyo-1`); omit or `all` for every region.",
+  reqEndpoints: "Endpoint keys to notify (e.g. `s3:ap-tokyo-1`); omit or `all` for every endpoint.",
+  respUpdated: "Existing subscription updated",
+  subGetSummary: "Get a subscription",
+  subGetDesc:
+    "Returns the current settings of a subscription. Requires the subscription token " +
+    "issued when subscribing.",
+  subDeleteSummary: "Unsubscribe (delete a subscription)",
+  subDeleteDesc: "Deletes the subscription for the email address. Requires the subscription token.",
+  unsubSummary: "One-click unsubscribe page",
+  unsubDesc:
+    "Landing page linked from the `List-Unsubscribe` header of notification emails. " +
+    "Deletes the subscription and renders a confirmation page. Requires email + token.",
+  paramEmail: "Subscribed email address (the subscription ID).",
+  paramToken: "Subscription token issued on subscribe.",
+  resp404: "Not found or invalid token",
   paramDate: "Date to inspect (YYYY-MM-DD). Default: today. Range: last 7 days including today.",
   paramEndpoint:
     "`all` (default) aggregates the worst status across every endpoint, " +
@@ -126,7 +157,24 @@ const JA: SpecStrings = {
     "`uptime` は返却ウィンドウ内の測定スロット中 `operational` の割合です。",
   subscribeSummary: "障害通知メールの登録",
   subscribeDesc:
-    "MEGA S4 / IAM の障害通知を受け取るメールアドレスを登録します。サービスはどちらか一方でも両方でも選択できます。",
+    "サブスクリプションを作成、または**同じメールアドレスを再送信した場合は設定を更新**します" +
+    "(メールアドレスがレコードID)。`services` や `regions` / `endpoints` で通知対象を絞り込めます" +
+    "(省略時または `all` はすべて)。 " +
+    "障害通知メールには RFC 2369 の `List-Unsubscribe`(および `List-Unsubscribe-Post: One-Click`)ヘッダーに " +
+    "`subscription.unsubscribeUrl` を指定して送信されます。",
+  reqRegions: "通知するリージョンID(例: `ap-tokyo-1`)。省略時または `all` はすべてのリージョン。",
+  reqEndpoints: "通知するエンドポイントキー(例: `s3:ap-tokyo-1`)。省略時または `all` はすべてのエンドポイント。",
+  respUpdated: "既存の登録を更新しました",
+  subGetSummary: "サブスクリプションの取得",
+  subGetDesc: "サブスクリプションの現在の設定を返します。購読時に発行されるトークンが必要です。",
+  subDeleteSummary: "配信停止(サブスクリプションの削除)",
+  subDeleteDesc: "指定したメールアドレスのサブスクリプションを削除します。トークンが必要です。",
+  unsubSummary: "ワンクリック配信停止ページ",
+  unsubDesc:
+    "通知メールの `List-Unsubscribe` ヘッダーからリンクされる解除ページ。サブスクリプションを削除して確認ページを表示します。email + token が必要です。",
+  paramEmail: "購読したメールアドレス(サブスクリプションID)。",
+  paramToken: "購読時に発行されるトークン。",
+  resp404: "存在しないか、トークンが不正です",
   paramDate: "確認する日付(YYYY-MM-DD)。デフォルトは当日。範囲は当日を含む過去7日。",
   paramEndpoint:
     "`all`(デフォルト)は全エンドポイントの最悪ステータス集約。" +
@@ -162,6 +210,24 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
     headers: {
       "Retry-After": { description: s.retryAfter, schema: { type: "integer" } },
     },
+    content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+  });
+  const emailParam = (st: SpecStrings) => ({
+    name: "email",
+    in: "query",
+    required: true,
+    description: st.paramEmail,
+    schema: { type: "string", format: "email", example: "you@example.com" },
+  });
+  const tokenParam = (st: SpecStrings) => ({
+    name: "token",
+    in: "query",
+    required: true,
+    description: st.paramToken,
+    schema: { type: "string" },
+  });
+  const notFound = (st: SpecStrings) => ({
+    description: st.resp404,
     content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
   });
 
@@ -301,55 +367,149 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
           tags: ["notifications"],
           summary: s.subscribeSummary,
           description: s.subscribeDesc,
-          requestBody: {
-            required: true,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["email"],
+                properties: {
+                  email: {
+                    type: "string",
+                    format: "email",
+                    description: s.emailDesc,
+                    example: "you@example.com",
+                  },
+                  services: {
+                    type: "array",
+                    items: { type: "string", enum: ["s3", "iam"] },
+                    description: s.servicesDesc,
+                    default: ["s3", "iam"],
+                    example: ["s3", "iam"],
+                  },
+                  regions: {
+                    type: "array",
+                    items: { type: "string", example: "ap-tokyo-1" },
+                    description: s.reqRegions,
+                  },
+                  endpoints: {
+                    type: "array",
+                    items: { type: "string", example: "s3:ap-tokyo-1" },
+                    description: s.reqEndpoints,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: s.resp201,
+            headers: rateHeaders(),
             content: {
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["email"],
                   properties: {
-                    email: {
-                      type: "string",
-                      format: "email",
-                      description: s.emailDesc,
-                      example: "you@example.com",
-                    },
-                    services: {
-                      type: "array",
-                      items: { type: "string", enum: ["s3", "iam"] },
-                      description: s.servicesDesc,
-                      default: ["s3", "iam"],
-                      example: ["s3", "iam"],
-                    },
+                    ok: { type: "boolean", example: true },
+                    updated: { type: "boolean", example: false },
+                    subscription: { $ref: "#/components/schemas/Subscription" },
                   },
                 },
               },
             },
           },
-          responses: {
-            201: {
-              description: s.resp201,
-              headers: rateHeaders(),
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "object",
-                    properties: {
-                      ok: { type: "boolean", example: true },
-                      email: { type: "string", example: "you@example.com" },
-                      services: { type: "array", items: { type: "string", enum: ["s3", "iam"] } },
-                    },
+          200: {
+            description: s.respUpdated,
+            headers: rateHeaders(),
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: { type: "boolean", example: true },
+                    updated: { type: "boolean", example: true },
+                    subscription: { $ref: "#/components/schemas/Subscription" },
                   },
                 },
               },
             },
-            400: badRequest(),
-            429: tooManyRequests(),
           },
+          400: badRequest(),
+          429: tooManyRequests(),
         },
       },
     },
+    "/api/subscriptions": {
+      get: {
+        tags: ["notifications"],
+        summary: s.subGetSummary,
+        description: s.subGetDesc,
+        parameters: [emailParam(s), tokenParam(s)],
+        responses: {
+          200: {
+            description: s.resp200,
+            headers: rateHeaders(),
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    subscription: { $ref: "#/components/schemas/Subscription" },
+                  },
+                },
+              },
+            },
+          },
+          404: notFound(s),
+          429: tooManyRequests(),
+        },
+      },
+      delete: {
+        tags: ["notifications"],
+        summary: s.subDeleteSummary,
+        description: s.subDeleteDesc,
+        parameters: [emailParam(s), tokenParam(s)],
+        responses: {
+          200: {
+            description: s.resp200,
+            headers: rateHeaders(),
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: { type: "boolean", example: true },
+                    unsubscribed: { type: "boolean", example: true },
+                    email: { type: "string", example: "you@example.com" },
+                  },
+                },
+              },
+            },
+          },
+          404: notFound(s),
+          429: tooManyRequests(),
+        },
+      },
+    },
+    "/api/unsubscribe": {
+      get: {
+        tags: ["notifications"],
+        summary: s.unsubSummary,
+        description: s.unsubDesc,
+        parameters: [emailParam(s), tokenParam(s)],
+        responses: {
+          200: {
+            description: s.resp200,
+            content: { "text/html": { schema: { type: "string" } } },
+          },
+          404: notFound(s),
+          429: tooManyRequests(),
+        },
+      },
+    },
+  },
     components: {
       schemas: {
         Status: {
@@ -425,6 +585,33 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
           type: "object",
           properties: {
             error: { type: "string", example: "invalid parameter" },
+          },
+        },
+        Subscription: {
+          type: "object",
+          description: s.subGetDesc,
+          properties: {
+            email: { type: "string", format: "email", example: "you@example.com" },
+            services: { type: "array", items: { type: "string", enum: ["s3", "iam"] } },
+            regions: {
+              oneOf: [
+                { type: "string", enum: ["all"] },
+                { type: "array", items: { type: "string", example: "ap-tokyo-1" } },
+              ],
+            },
+            endpoints: {
+              oneOf: [
+                { type: "string", enum: ["all"] },
+                { type: "array", items: { type: "string", example: "s3:ap-tokyo-1" } },
+              ],
+            },
+            unsubscribeUrl: {
+              type: "string",
+              description: s.unsubDesc,
+              example: "https://s4status.sessapps.com/api/unsubscribe?email=you%40example.com&token=...",
+            },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
           },
         },
       },

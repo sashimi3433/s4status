@@ -187,8 +187,73 @@ function handleTimeline(url: URL, now: Date): Response {
   });
 }
 
-const subscriptions = new Set<string>();
+// ---------------------------------------------------------------------------
+// Subscriptions. The (lowercased) email address is the record ID: POSTing
+// again with the same address updates it in place. The token authenticates
+// view/delete/unsubscribe links (used in the List-Unsubscribe header of
+// notification emails).
+// ---------------------------------------------------------------------------
+
+interface Subscription {
+  email: string;
+  services: ("s3" | "iam")[];
+  regions: string[]; // [] = all regions
+  endpoints: string[]; // [] = all endpoints
+  token: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const subscriptions = new Map<string, Subscription>();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function tokenHex(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function parseSubscribeBody(
+  body: unknown,
+): { ok: true; data: Omit<Subscription, "token" | "createdAt" | "updatedAt"> } | { ok: false; error: string } {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const email = typeof b.email === "string" ? b.email.trim().toLowerCase() : "";
+  if (!EMAIL_RE.test(email)) return { ok: false, error: "invalid email address" };
+
+  const services: ("s3" | "iam")[] = Array.isArray(b.services)
+    ? [...new Set(b.services.filter((s): s is "s3" | "iam" => s === "s3" || s === "iam"))].sort()
+    : ["s3", "iam"];
+  if (services.length === 0) return { ok: false, error: "services must contain 's3' and/or 'iam'" };
+
+  const wantsAll = (list: unknown) =>
+    !Array.isArray(list) || list.length === 0 || (list as unknown[]).includes("all");
+  const pickValid = (list: unknown, valid: (v: string) => boolean) =>
+    wantsAll(list)
+      ? []
+      : [...new Set((list as unknown[]).filter((r): r is string => typeof r === "string" && valid(r)))];
+
+  const regions = pickValid(b.regions, (r) => REGIONS.some((x) => x.id === r));
+  if (!wantsAll(b.regions) && regions.length === 0) {
+    return { ok: false, error: "invalid regions (see /api/endpoints for region IDs)" };
+  }
+  const endpoints = pickValid(b.endpoints, (k) => ENDPOINTS.some((e) => e.key === k));
+  if (!wantsAll(b.endpoints) && endpoints.length === 0) {
+    return { ok: false, error: "invalid endpoints (see /api/endpoints for endpoint keys)" };
+  }
+  return { ok: true, data: { email, services, regions, endpoints } };
+}
+
+function subscriptionView(s: Subscription, origin: string) {
+  return {
+    email: s.email,
+    services: s.services,
+    regions: s.regions.length ? s.regions : "all",
+    endpoints: s.endpoints.length ? s.endpoints : "all",
+    unsubscribeUrl: `${origin}/api/unsubscribe?email=${encodeURIComponent(s.email)}&token=${s.token}`,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  };
+}
 
 async function handleSubscribe(request: Request): Promise<Response> {
   let body: unknown;
@@ -197,17 +262,82 @@ async function handleSubscribe(request: Request): Promise<Response> {
   } catch {
     return badRequest("invalid JSON body");
   }
-  const b = body as { email?: unknown; services?: unknown };
-  const email = typeof b.email === "string" ? b.email.trim() : "";
-  if (!EMAIL_RE.test(email)) return badRequest("invalid email address");
+  const parsed = parseSubscribeBody(body);
+  if (!parsed.ok) return badRequest(parsed.error);
+  const { email, services, regions, endpoints } = parsed.data;
 
-  const services = Array.isArray(b.services)
-    ? [...new Set(b.services.filter((s): s is "s3" | "iam" => s === "s3" || s === "iam"))].sort()
-    : ["s3", "iam"];
-  if (services.length === 0) return badRequest("services must contain 's3' and/or 'iam'");
+  const origin = new URL(request.url).origin;
+  const now = new Date().toISOString();
+  const existing = subscriptions.get(email);
+  if (existing) {
+    existing.services = services;
+    existing.regions = regions;
+    existing.endpoints = endpoints;
+    existing.updatedAt = now;
+    return json({ ok: true, updated: true, subscription: subscriptionView(existing, origin) }, 200);
+  }
+  const sub: Subscription = {
+    email,
+    services,
+    regions,
+    endpoints,
+    token: tokenHex(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  subscriptions.set(email, sub);
+  return json({ ok: true, updated: false, subscription: subscriptionView(sub, origin) }, 201);
+}
 
-  subscriptions.add(`${email}|${services.join(",")}`);
-  return json({ ok: true, email, services }, 201);
+function requireSubscription(url: URL): Subscription | null {
+  const email = (url.searchParams.get("email") ?? "").trim().toLowerCase();
+  const token = url.searchParams.get("token") ?? "";
+  const sub = subscriptions.get(email);
+  return sub && token && token === sub.token ? sub : null;
+}
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** One-click unsubscribe landing page (linked from List-Unsubscribe headers). */
+function handleUnsubscribePage(url: URL): Response {
+  const sub = requireSubscription(url);
+  const page = (title: string, body: string, status: number) =>
+    new Response(
+      `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title} — MEGA S4 Status</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+           background: #09090b; color: #fafafa;
+           font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", sans-serif; }
+    main { text-align: center; padding: 2rem; }
+    h1 { font-size: 1.4rem; margin: 0 0 .75rem; }
+    p { color: #a1a1aa; margin: .25rem 0; }
+    a { color: #34d399; }
+  </style>
+</head>
+<body><main>${body}</main></body>
+</html>`,
+      { status, headers: { "Content-Type": "text/html; charset=utf-8", ...CORS_HEADERS } },
+    );
+
+  if (!sub) {
+    return page(
+      "配信停止",
+      "<h1>リンクが無効です</h1><p>この解除リンクは存在しないか、すでに使用されました。</p><p><a href=\"/\">MEGA S4 Status に戻る</a></p>",
+      404,
+    );
+  }
+  subscriptions.delete(sub.email);
+  return page(
+    "配信停止",
+    `<h1>通知配信を停止しました</h1><p>Unsubscribed: ${escapeHtml(sub.email)}</p><p><a href="/">MEGA S4 Status に戻る</a></p>`,
+    200,
+  );
 }
 
 /** Scalar API reference (loads the OpenAPI spec from /api/openapi.json,
@@ -272,7 +402,11 @@ export default {
         return json({ error: "rate limit exceeded (100 requests/minute)" }, 429, rate);
       }
 
-      if (request.method !== "GET" && url.pathname !== "/api/subscribe") {
+      if (
+        request.method !== "GET" &&
+        url.pathname !== "/api/subscribe" &&
+        url.pathname !== "/api/subscriptions"
+      ) {
         return json({ error: "method not allowed" }, 405, rate);
       }
 
@@ -288,6 +422,25 @@ export default {
         case "/api/subscribe":
           if (request.method !== "POST") return json({ error: "method not allowed" }, 405, rate);
           return handleSubscribe(request);
+        case "/api/subscriptions":
+          if (request.method !== "GET" && request.method !== "DELETE") {
+            return json({ error: "method not allowed" }, 405, rate);
+          }
+          {
+            const sub = requireSubscription(url);
+            if (!sub) return json({ error: "not found or invalid token" }, 404, rate);
+            if (request.method === "DELETE") {
+              subscriptions.delete(sub.email);
+              return json({ ok: true, unsubscribed: true, email: sub.email }, 200, rate);
+            }
+            return json(
+              { subscription: subscriptionView(sub, url.origin) },
+              200,
+              rate,
+            );
+          }
+        case "/api/unsubscribe":
+          return handleUnsubscribePage(url);
         default:
           return json({ error: "not found" }, 404, rate);
       }
