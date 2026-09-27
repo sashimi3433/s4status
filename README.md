@@ -44,7 +44,21 @@ npm run deploy     # ビルドして wrangler deploy (Cloudflare Workers)
 npx wrangler dev   # Workers ランタイムでのローカル配信確認 (dist/)
 ```
 
-`wrangler.jsonc` は assets のみの SPA 構成(`@cloudflare/vite-plugin` がビルド成果物を配信)。
+`wrangler.jsonc` は SPA + Worker の構成(`@cloudflare/vite-plugin` が `dist/client` を配信し、`src/worker.ts` が `/api/*` を処理)。
+
+## 公開API(認証不要 / レートリミット100req/分/IP)
+
+インタラクティブなドキュメント(Scalar): **/docs** — OpenAPI 3.1 スペックは `/api/openapi.json`
+
+| エンドポイント | 内容 |
+|---|---|
+| `GET /api/overview` | 全体ステータス + 全28エンドポイントの現在ステータス/稼働率 |
+| `GET /api/endpoints` | 監視対象エンドポイント一覧 |
+| `GET /api/operations` | 監視対象34操作一覧 |
+| `GET /api/timeline?date=&endpoint=&hour=` | 操作×5分スロットのステータス履歴(日=288/時間=12スロット) |
+| `POST /api/subscribe` | 障害通知メールの登録 `{email, services[]}` |
+
+すべての `/api/*` 応答には `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` ヘッダーが付き、制限超過時は `429` + `Retry-After` を返します。CORSは全許可。
 
 ## 本番データとの接続(ワーカー側の実装メモ)
 

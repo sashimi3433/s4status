@@ -12,6 +12,9 @@ export default function Footer() {
           <p className="max-w-xl leading-relaxed">{t("footer.disclaimer")}</p>
         </div>
         <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row sm:gap-4 sm:self-center">
+          <a className="hover:text-zinc-800 dark:hover:text-zinc-200" href="/docs">
+            API
+          </a>
           <a
             className="flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-200"
             href="mailto:contact@sessapps.com"

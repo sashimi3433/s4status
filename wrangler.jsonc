@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "s4status",
   "account_id": "6b40720fcf7fc5bcc9a75cf47654ef4e",
+  "main": "src/worker.ts",
   "compatibility_date": "2026-09-25",
   // Static SPA served from Cloudflare Workers.
   // The build output is wired up automatically by @cloudflare/vite-plugin.
