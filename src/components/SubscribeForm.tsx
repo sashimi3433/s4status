@@ -11,6 +11,9 @@ export default function SubscribeForm() {
   const [error, setError] = useState(false);
   const [updated, setUpdated] = useState(false);
   const [done, setDone] = useState(false);
+  const [unsubscribed, setUnsubscribed] = useState(false);
+
+  const validEmail = () => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
 
   const allRegions = regions.size === 0;
 
@@ -25,8 +28,7 @@ export default function SubscribeForm() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-    if (!valid) {
+    if (!validEmail()) {
       setError(true);
       setDone(false);
       return;
@@ -45,11 +47,34 @@ export default function SubscribeForm() {
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as { updated?: boolean };
       setError(false);
+      setUnsubscribed(false);
       setUpdated(!!data.updated);
       setDone(true);
     } catch {
       setError(true);
       setDone(false);
+    }
+  };
+
+  const unsubscribe = async () => {
+    if (!validEmail()) {
+      setError(true);
+      setDone(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/unsubscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setError(false);
+      setDone(false);
+      setUnsubscribed(true);
+    } catch {
+      setError(true);
+      setUnsubscribed(false);
     }
   };
 
@@ -102,12 +127,21 @@ export default function SubscribeForm() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700 active:scale-[.97] dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          >
-            {t("subscribe.button")}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700 active:scale-[.97] dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            >
+              {t("subscribe.button")}
+            </button>
+            <button
+              type="button"
+              onClick={unsubscribe}
+              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-50 active:scale-[.97] dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
+            >
+              {t("subscribe.unsubscribe")}
+            </button>
+          </div>
         </form>
 
         <details className="group mt-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
@@ -167,6 +201,21 @@ export default function SubscribeForm() {
               <path d="M20 6 9 17l-5-5" />
             </svg>
             {t(updated ? "subscribe.updated" : "subscribe.success")}
+          </p>
+        )}
+        {unsubscribed && !error && (
+          <p className="anim-slide-down mt-2 flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="h-4 w-4"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+            {t("subscribe.unsubscribed")}
           </p>
         )}
       </div>

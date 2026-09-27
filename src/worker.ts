@@ -478,7 +478,8 @@ export default {
       if (
         request.method !== "GET" &&
         url.pathname !== "/api/subscribe" &&
-        url.pathname !== "/api/subscriptions"
+        url.pathname !== "/api/subscriptions" &&
+        url.pathname !== "/api/unsubscribe"
       ) {
         return json({ error: "method not allowed" }, 405, rate);
       }
@@ -515,6 +516,25 @@ export default {
             );
           }
         case "/api/unsubscribe":
+          if (request.method === "POST") {
+            // GUI unsubscribe: email-only, idempotent — always 200 {ok:true}.
+            let body: unknown;
+            try {
+              body = await request.json();
+            } catch {
+              return badRequest("invalid JSON body");
+            }
+            const email =
+              typeof (body as { email?: unknown })?.email === "string"
+                ? ((body as { email: string }).email).trim().toLowerCase()
+                : "";
+            if (!EMAIL_RE.test(email)) return badRequest("invalid email address");
+            await ensureSchema(env);
+            await env.DB.prepare("DELETE FROM subscriptions WHERE email = ?1")
+              .bind(email)
+              .run();
+            return json({ ok: true }, 200, rate);
+          }
           return handleUnsubscribePage(url, env);
         default:
           return json({ error: "not found" }, 404, rate);

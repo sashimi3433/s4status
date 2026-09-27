@@ -29,6 +29,8 @@ interface SpecStrings {
   subDeleteDesc: string;
   unsubSummary: string;
   unsubDesc: string;
+  unsubPostSummary: string;
+  unsubPostDesc: string;
   paramEmail: string;
   paramToken: string;
   resp404: string;
@@ -101,6 +103,11 @@ const EN: SpecStrings = {
   unsubDesc:
     "Landing page linked from the `List-Unsubscribe` header of notification emails. " +
     "Deletes the subscription and renders a confirmation page. Requires email + token.",
+  unsubPostSummary: "Unsubscribe by email address",
+  unsubPostDesc:
+    "Deletes the subscription for the given email address, if it exists. " +
+    "Idempotent — always returns `200 {\"ok\": true}` (used by the website's unsubscribe button). " +
+    "For programmatic use, the token-authenticated `DELETE /api/subscriptions` is preferred.",
   paramEmail: "Subscribed email address (the subscription ID).",
   paramToken: "Subscription token issued on subscribe.",
   resp404: "Not found or invalid token",
@@ -172,6 +179,11 @@ const JA: SpecStrings = {
   unsubSummary: "ワンクリック配信停止ページ",
   unsubDesc:
     "通知メールの `List-Unsubscribe` ヘッダーからリンクされる解除ページ。サブスクリプションを削除して確認ページを表示します。email + token が必要です。",
+  unsubPostSummary: "メールアドレスによる配信停止",
+  unsubPostDesc:
+    "指定したメールアドレスのサブスクリプションを削除します(存在しなければ何もしません)。 " +
+    "冪等で、常に `200 {\"ok\": true}` を返します(ウェブサイトの配信停止ボタンから使用)。 " +
+    "プログラムからの利用には、トークン認証付きの `DELETE /api/subscriptions` を推奨します。",
   paramEmail: "購読したメールアドレス(サブスクリプションID)。",
   paramToken: "購読時に発行されるトークン。",
   resp404: "存在しないか、トークンが不正です",
@@ -505,6 +517,46 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
             content: { "text/html": { schema: { type: "string" } } },
           },
           404: notFound(s),
+          429: tooManyRequests(),
+        },
+      },
+      post: {
+        tags: ["notifications"],
+        summary: s.unsubPostSummary,
+        description: s.unsubPostDesc,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["email"],
+                properties: {
+                  email: {
+                    type: "string",
+                    format: "email",
+                    description: s.paramEmail,
+                    example: "you@example.com",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: s.resp200,
+            headers: rateHeaders(),
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { ok: { type: "boolean", example: true } },
+                },
+              },
+            },
+          },
+          400: badRequest(),
           429: tooManyRequests(),
         },
       },
