@@ -5,6 +5,13 @@
   "main": "src/worker.ts",
   "routes": [{ "pattern": "s4status.sessapps.com", "custom_domain": true }],
   "compatibility_date": "2026-09-25",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "s4status",
+      "database_id": "81613e59-866c-4492-a74f-0bba640b2ddc"
+    }
+  ],
   // Static SPA served from Cloudflare Workers.
   // The build output is wired up automatically by @cloudflare/vite-plugin.
   "assets": {

@@ -204,8 +204,46 @@ interface Subscription {
   updatedAt: string;
 }
 
-const subscriptions = new Map<string, Subscription>();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+interface SubRow {
+  email: string;
+  services: string;
+  regions: string;
+  endpoints: string;
+  token: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToSub(r: SubRow): Subscription {
+  return {
+    email: r.email,
+    services: JSON.parse(r.services) as ("s3" | "iam")[],
+    regions: JSON.parse(r.regions) as string[],
+    endpoints: JSON.parse(r.endpoints) as string[],
+    token: r.token,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+let schemaReady = false;
+async function ensureSchema(env: Env): Promise<void> {
+  if (schemaReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS subscriptions (
+      email TEXT PRIMARY KEY,
+      services TEXT NOT NULL,
+      regions TEXT NOT NULL,
+      endpoints TEXT NOT NULL,
+      token TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
+  ).run();
+  schemaReady = true;
+}
 
 function tokenHex(): string {
   const bytes = new Uint8Array(32);
@@ -255,7 +293,8 @@ function subscriptionView(s: Subscription, origin: string) {
   };
 }
 
-async function handleSubscribe(request: Request): Promise<Response> {
+async function handleSubscribe(request: Request, env: Env): Promise<Response> {
+  await ensureSchema(env);
   let body: unknown;
   try {
     body = await request.json();
@@ -268,13 +307,31 @@ async function handleSubscribe(request: Request): Promise<Response> {
 
   const origin = new URL(request.url).origin;
   const now = new Date().toISOString();
-  const existing = subscriptions.get(email);
+  const existing = await env.DB.prepare("SELECT * FROM subscriptions WHERE email = ?1")
+    .bind(email)
+    .first<SubRow>();
   if (existing) {
-    existing.services = services;
-    existing.regions = regions;
-    existing.endpoints = endpoints;
-    existing.updatedAt = now;
-    return json({ ok: true, updated: true, subscription: subscriptionView(existing, origin) }, 200);
+    await env.DB.prepare(
+      "UPDATE subscriptions SET services = ?1, regions = ?2, endpoints = ?3, updated_at = ?4 WHERE email = ?5",
+    )
+      .bind(
+        JSON.stringify(services),
+        JSON.stringify(regions),
+        JSON.stringify(endpoints),
+        now,
+        email,
+      )
+      .run();
+    const sub: Subscription = {
+      email,
+      services,
+      regions,
+      endpoints,
+      token: existing.token,
+      createdAt: existing.created_at,
+      updatedAt: now,
+    };
+    return json({ ok: true, updated: true, subscription: subscriptionView(sub, origin) }, 200);
   }
   const sub: Subscription = {
     email,
@@ -285,23 +342,39 @@ async function handleSubscribe(request: Request): Promise<Response> {
     createdAt: now,
     updatedAt: now,
   };
-  subscriptions.set(email, sub);
+  await env.DB.prepare(
+    "INSERT INTO subscriptions (email, services, regions, endpoints, token, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+  )
+    .bind(
+      email,
+      JSON.stringify(services),
+      JSON.stringify(regions),
+      JSON.stringify(endpoints),
+      sub.token,
+      now,
+      now,
+    )
+    .run();
   return json({ ok: true, updated: false, subscription: subscriptionView(sub, origin) }, 201);
 }
 
-function requireSubscription(url: URL): Subscription | null {
+async function requireSubscription(url: URL, env: Env): Promise<Subscription | null> {
+  await ensureSchema(env);
   const email = (url.searchParams.get("email") ?? "").trim().toLowerCase();
   const token = url.searchParams.get("token") ?? "";
-  const sub = subscriptions.get(email);
-  return sub && token && token === sub.token ? sub : null;
+  if (!email || !token) return null;
+  const row = await env.DB.prepare("SELECT * FROM subscriptions WHERE email = ?1")
+    .bind(email)
+    .first<SubRow>();
+  return row && row.token === token ? rowToSub(row) : null;
 }
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** One-click unsubscribe landing page (linked from List-Unsubscribe headers). */
-function handleUnsubscribePage(url: URL): Response {
-  const sub = requireSubscription(url);
+async function handleUnsubscribePage(url: URL, env: Env): Promise<Response> {
+  const sub = await requireSubscription(url, env);
   const page = (title: string, body: string, status: number) =>
     new Response(
       `<!doctype html>
@@ -332,7 +405,7 @@ function handleUnsubscribePage(url: URL): Response {
       404,
     );
   }
-  subscriptions.delete(sub.email);
+  await env.DB.prepare("DELETE FROM subscriptions WHERE email = ?1").bind(sub.email).run();
   return page(
     "配信停止",
     `<h1>通知配信を停止しました</h1><p>Unsubscribed: ${escapeHtml(sub.email)}</p><p><a href="/">MEGA S4 Status に戻る</a></p>`,
@@ -378,7 +451,7 @@ function docsPage(lang: string | null): Response {
 // ---------------------------------------------------------------------------
 
 export default {
-  async fetch(request: Request, env: { ASSETS: { fetch: (req: Request) => Promise<Response> } }): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const now = new Date();
 
@@ -421,16 +494,18 @@ export default {
           return handleTimeline(url, now);
         case "/api/subscribe":
           if (request.method !== "POST") return json({ error: "method not allowed" }, 405, rate);
-          return handleSubscribe(request);
+          return handleSubscribe(request, env);
         case "/api/subscriptions":
           if (request.method !== "GET" && request.method !== "DELETE") {
             return json({ error: "method not allowed" }, 405, rate);
           }
           {
-            const sub = requireSubscription(url);
+            const sub = await requireSubscription(url, env);
             if (!sub) return json({ error: "not found or invalid token" }, 404, rate);
             if (request.method === "DELETE") {
-              subscriptions.delete(sub.email);
+              await env.DB.prepare("DELETE FROM subscriptions WHERE email = ?1")
+                .bind(sub.email)
+                .run();
               return json({ ok: true, unsubscribed: true, email: sub.email }, 200, rate);
             }
             return json(
@@ -440,7 +515,7 @@ export default {
             );
           }
         case "/api/unsubscribe":
-          return handleUnsubscribePage(url);
+          return handleUnsubscribePage(url, env);
         default:
           return json({ error: "not found" }, 404, rate);
       }
