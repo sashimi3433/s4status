@@ -118,9 +118,10 @@ function OpRow({
       >
         {op.id}
       </span>
-      {/* Bars pop in one by one (flutter). Day view: 2ms stagger per slot so
-          the wave crosses a row in ~0.6s, plus a sheen sweep after it; hour
-          view: 35ms stagger for a slower, chunkier cascade. */}
+      {/* Bars fade in one by one (hour view: 35ms stagger, day view: 2ms) and
+          a sheen sweeps the row after the cascade (day view). Opacity-only:
+          scaling bars on the compositor renders them slightly soft and
+          de-promoting the layer at animation end visibly "sharpens" them. */}
       <div
         className={`flex h-7 cursor-crosshair gap-px overflow-hidden rounded-[3px]${hourView ? "" : " anim-row-sheen"}`}
         style={hourView ? undefined : ({ "--rd": `${revealDelay}ms` } as CSSProperties)}
@@ -131,7 +132,7 @@ function OpRow({
             data-op={op.id}
             data-idx={i}
             data-status={s}
-            className={`${hourView ? "anim-slot-pop" : "anim-slot-fade"} h-full min-w-0 flex-1 hover:brightness-125 ${STATUS_BG[s]}`}
+            className={`anim-slot-fade h-full min-w-0 flex-1 hover:brightness-125 ${STATUS_BG[s]}`}
             style={{ animationDelay: `${revealDelay + i * (hourView ? 35 : 2)}ms` }}
           />
         ))}

@@ -66,17 +66,10 @@
     opacity: 1;
   }
 }
-/* Bars pop in one by one (day view: 2ms stagger, hour view: 35ms) */
-@keyframes slot-pop {
-  from {
-    opacity: 0;
-    transform: scaleY(0.1);
-  }
-}
-/* Day view fade variant: opacity only. Scaling tiny 2-3px bars on the
-   compositor renders them slightly soft, and de-promoting the layer when the
-   animation ends visibly "sharpens" everything at once. Keeping geometry
-   fixed avoids that rasterization snap. */
+/* Bars fade in one by one (day view: 2ms stagger, hour view: 35ms).
+   Opacity only: scaling bars on the compositor renders them slightly soft,
+   and de-promoting the layer when the animation ends visibly "sharpens"
+   everything at once. Keeping geometry fixed avoids that rasterization snap. */
 @keyframes slot-fade {
   from {
     opacity: 0;
@@ -133,9 +126,6 @@
   );
   animation: bar-sheen 0.8s ease calc(var(--rd, 0ms) + 1000ms) backwards;
 }
-.anim-slot-pop {
-  animation: slot-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-}
 .anim-slot-fade {
   animation: slot-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
@@ -143,7 +133,6 @@
 /* Hold the timeline cascade until it scrolls into view; Timeline.tsx removes
    this class via IntersectionObserver. Paused also freezes the delay phase,
    so bars stay invisible and the stagger starts on release. */
-.anim-hold .anim-slot-pop,
 .anim-hold .anim-slot-fade,
 .anim-hold .anim-row-sheen::after {
   animation-play-state: paused;
