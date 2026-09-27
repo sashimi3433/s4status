@@ -236,7 +236,7 @@ function docsPage(): Response {
 // ---------------------------------------------------------------------------
 
 export default {
-  async fetch(request: Request): Promise<Response> {
+  async fetch(request: Request, env: { ASSETS: { fetch: (req: Request) => Promise<Response> } }): Promise<Response> {
     const url = new URL(request.url);
     const now = new Date();
 
@@ -281,6 +281,8 @@ export default {
       }
     }
 
-    return new Response("Not Found", { status: 404 });
+    // Any other path falls through to the static assets (SPA fallback via
+    // not_found_handling, so deep links still serve index.html).
+    return env.ASSETS.fetch(request);
   },
 };
