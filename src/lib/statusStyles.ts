@@ -16,9 +16,9 @@ export const STATUS_CHIP_BG: Record<StatusCode, string> = {
   nodata: "bg-zinc-500/10 text-zinc-600 dark:bg-zinc-400/10 dark:text-zinc-300",
 };
 
-/** Bigger banner variant for the overall status */
-export function bannerClasses(ok: boolean): string {
-  return ok
-    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-    : "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300";
-}
+/** Solid hero banner variants for the overall status */
+export const BANNER_BG: Record<"operational" | "degraded" | "outage", string> = {
+  operational: "border-transparent bg-emerald-600 text-white",
+  degraded: "border-transparent bg-amber-500 text-zinc-900",
+  outage: "border-transparent bg-red-600 text-white",
+};

@@ -66,10 +66,12 @@ export default function App() {
           <Terms />
         ) : (
           <>
-            <OverallStats
-              statuses={statuses}
-              uptimes={uptimes}
-              lastChecked={lastChecked}
+        <OverallStats
+          statuses={statuses}
+          uptimes={uptimes}
+          todayStr={todayStr}
+          currentSlot={currentSlot}
+          lastChecked={lastChecked}
               now={now}
               selected={selectedEndpoint}
               onSelect={selectEndpoint}

@@ -1,8 +1,40 @@
 import { ENDPOINTS, REGIONS } from "../data/regions";
 import { OPERATIONS } from "../data/operations";
-import { endpointWorstDay, STATUS_OF, worst, type StatusCode } from "../data/mock";
+import {
+  dayStatusCodes,
+  endpointWorstDay,
+  STATUS_OF,
+  worst,
+  type StatusCode,
+} from "../data/mock";
 import { useI18n, type MessageKey } from "../lib/i18n";
-import { STATUS_CHIP_BG, STATUS_DOT, bannerClasses } from "../lib/statusStyles";
+import { STATUS_CHIP_BG, STATUS_DOT, BANNER_BG } from "../lib/statusStyles";
+
+function AlertIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="m10.29 3.86-8.47 14.14A2 2 0 0 0 3.53 21h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <path d="M12 9v4m0 4h.01" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <path d="m9 11 3 3L22 4" />
+    </svg>
+  );
+}
+
+/** Minutes since the endpoint left "operational" (contiguous tail of today). */
+function ongoingMinutes(epKey: string, todayStr: string, currentSlot: number): number {
+  const codes = endpointWorstDay(epKey, todayStr, todayStr, currentSlot);
+  let s = currentSlot;
+  while (s >= 0 && codes[s] !== 0) s--;
+  return (currentSlot - s) * 5;
+}
 
 /** Worst status across all operations, per endpoint, for the current slot. */
 export function computeEndpointStatuses(
@@ -61,6 +93,8 @@ const CITY_GROUPS = (() => {
 interface Props {
   statuses: Map<string, StatusCode>;
   uptimes: Map<string, number | null>;
+  todayStr: string;
+  currentSlot: number;
   lastChecked: Date;
   now: Date;
   selected: string; // endpoint key or "all"
@@ -70,6 +104,8 @@ interface Props {
 export default function OverallStats({
   statuses,
   uptimes,
+  todayStr,
+  currentSlot,
   lastChecked,
   now,
   selected,
@@ -77,42 +113,95 @@ export default function OverallStats({
 }: Props) {
   const { t } = useI18n();
 
-  const allOk = ENDPOINTS.every((ep) => statuses.get(ep.key) === "operational");
-  const affected = ENDPOINTS.filter((ep) => statuses.get(ep.key) !== "operational").length;
+  const affectedList = ENDPOINTS.map((ep) => ({
+    ep,
+    st: statuses.get(ep.key) ?? "operational",
+  })).filter((x) => x.st !== "operational");
+  const overallState: "operational" | "degraded" | "outage" = affectedList.some(
+    (x) => x.st === "outage",
+  )
+    ? "outage"
+    : affectedList.length > 0
+      ? "degraded"
+      : "operational";
+  const allOk = overallState === "operational";
+  const affected = affectedList.length;
+
+  // Longest ongoing incident across affected endpoints
+  const incidentMinutes = affectedList.reduce(
+    (max, { ep }) => Math.max(max, ongoingMinutes(ep.key, todayStr, currentSlot)),
+    0,
+  );
+  const durationLabel =
+    incidentMinutes >= 60
+      ? t("stats.durationHour", { h: Math.round((incidentMinutes / 60) * 10) / 10 })
+      : t("stats.durationMin", { m: incidentMinutes });
+
+  // Distinct operations currently failing on any affected endpoint
+  const affectedOpIds = new Set<string>();
+  for (const { ep } of affectedList) {
+    for (const op of OPERATIONS) {
+      const code = dayStatusCodes(op.id, ep.key, todayStr, todayStr, currentSlot)[currentSlot]!;
+      if (code !== 0) affectedOpIds.add(op.id);
+    }
+  }
 
   const regionName = (city: string) => t(`region.${city}` as MessageKey);
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pt-8">
-      {/* Overall banner */}
-      <div
-        className={`anim-fade-up flex flex-col gap-2 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between ${bannerClasses(allOk)}`}
-      >
-        <div className="flex items-center gap-3">
-          <span key={String(allOk)} className="anim-pop-in relative flex h-3.5 w-3.5 shrink-0">
-            {!allOk && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-60" />
-            )}
-            <span
-              className={`relative inline-flex h-3.5 w-3.5 rounded-full ${allOk ? "bg-emerald-500" : "bg-red-500"}`}
-            />
-          </span>
-          <div>
-            <p className="text-lg font-semibold">
-              {allOk ? t("stats.allOperational") : t("stats.someIssues")}
-            </p>
-            {!allOk && (
-              <p className="text-sm opacity-90">
-                {t("stats.affectedEndpoints", { n: affected })}
-              </p>
-            )}
+      {/* Overall hero banner */}
+      {allOk ? (
+        <div
+          className={`anim-fade-up flex flex-col gap-2 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between ${BANNER_BG.operational}`}
+        >
+          <div className="flex items-center gap-3">
+            <CheckIcon className="h-6 w-6 shrink-0" />
+            <p className="text-lg font-semibold">{t("stats.allOperational")}</p>
+          </div>
+          <div className="text-sm opacity-90">
+            <p>{t("stats.lastUpdated", { t: agoLabel(now, lastChecked, t) })}</p>
+            <p className="sm:text-right">{t("stats.operations", { n: OPERATIONS.length })}</p>
           </div>
         </div>
-        <div className="text-sm opacity-80">
-          <p>{t("stats.lastUpdated", { t: agoLabel(now, lastChecked, t) })}</p>
-          <p className="sm:text-right">{t("stats.operations", { n: OPERATIONS.length })}</p>
+      ) : (
+        <div className={`anim-fade-up overflow-hidden rounded-xl border ${BANNER_BG[overallState]}`}>
+          <div className="p-6 sm:p-8">
+            <div className="flex items-start gap-4">
+              <AlertIcon
+                className={`mt-0.5 h-7 w-7 shrink-0 ${overallState === "outage" ? "animate-pulse" : ""}`}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xl font-bold tracking-tight sm:text-2xl">
+                  {t(overallState === "outage" ? "stats.incidentOutage" : "stats.incidentDegraded")}
+                </p>
+                <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm opacity-90">
+                  <span>{t("stats.affectedEndpoints", { n: affected })}</span>
+                  <span>{durationLabel}</span>
+                  <span>{t("stats.affectedOperations", { n: affectedOpIds.size })}</span>
+                </p>
+              </div>
+              <div className="hidden shrink-0 text-right text-xs opacity-75 sm:block">
+                <p>{t("stats.lastUpdated", { t: agoLabel(now, lastChecked, t) })}</p>
+                <p className="mt-0.5">{t("stats.operations", { n: OPERATIONS.length })}</p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {affectedList.map(({ ep, st }) => (
+                <span
+                  key={ep.key}
+                  className={`inline-flex items-center gap-2 rounded-md px-2.5 py-1 font-mono text-xs font-semibold ${
+                    overallState === "outage" ? "bg-white/15" : "bg-black/10"
+                  }`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
+                  {ep.url} · {t(`status.${st}` as const)}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Endpoint cards */}
       <div className="mt-5 flex items-center justify-between">
