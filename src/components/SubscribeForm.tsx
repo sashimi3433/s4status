@@ -8,6 +8,7 @@ export default function SubscribeForm() {
   const [services, setServices] = useState({ s3: true, iam: true });
   // empty set = all regions
   const [regions, setRegions] = useState<Set<string>>(new Set());
+  const [regionsOpen, setRegionsOpen] = useState(false);
   const [error, setError] = useState(false);
   const [updated, setUpdated] = useState(false);
   const [done, setDone] = useState(false);
@@ -144,43 +145,74 @@ export default function SubscribeForm() {
           </div>
         </form>
 
-        <details className="group mt-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <summary className="flex cursor-pointer select-none items-center justify-between px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/60">
+        <div className="mt-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <button
+            type="button"
+            onClick={() => setRegionsOpen((v) => !v)}
+            aria-expanded={regionsOpen}
+            className="flex w-full cursor-pointer select-none items-center justify-between px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+          >
             {t("subscribe.regions")}
-            <span className="text-zinc-400 dark:text-zinc-500">
+            <span className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500">
               {allRegions ? t("subscribe.allRegions") : `${regions.size}`}
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-3.5 w-3.5 transition-transform ${regionsOpen ? "rotate-180" : ""}`}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
             </span>
-          </summary>
-          <div className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
-            <label className="mb-2 inline-flex cursor-pointer items-center gap-1.5 text-sm">
-              <input
-                type="checkbox"
-                checked={allRegions}
-                onChange={() => setRegions(new Set())}
-                className="h-3.5 w-3.5 accent-emerald-600"
-              />
-              {t("subscribe.allRegions")}
-            </label>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-7">
-              {REGIONS.map((r) => (
+          </button>
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+              regionsOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`}
+          >
+            <div className="overflow-hidden">
+              {/* keyed by open state so the checkbox stagger replays on each open */}
+              <div
+                key={String(regionsOpen)}
+                className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800"
+              >
                 <label
-                  key={r.id}
-                  className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300"
+                  className="anim-fade-in mb-2 inline-flex cursor-pointer items-center gap-1.5 text-sm"
                 >
                   <input
                     type="checkbox"
-                    checked={regions.has(r.id)}
-                    onChange={() => toggleRegion(r.id)}
-                    className="h-3 w-3 accent-emerald-600"
+                    checked={allRegions}
+                    onChange={() => setRegions(new Set())}
+                    className="h-3.5 w-3.5 accent-emerald-600"
                   />
-                  <span className="truncate">
-                    {t(`region.${r.city}` as MessageKey)} {r.zone}
-                  </span>
+                  {t("subscribe.allRegions")}
                 </label>
-              ))}
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-7">
+                  {REGIONS.map((r, i) => (
+                    <label
+                      key={r.id}
+                      style={{ animationDelay: `${60 + i * 15}ms` }}
+                      className="anim-fade-in inline-flex cursor-pointer items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={regions.has(r.id)}
+                        onChange={() => toggleRegion(r.id)}
+                        className="h-3 w-3 accent-emerald-600"
+                      />
+                      <span className="truncate">
+                        {t(`region.${r.city}` as MessageKey)} {r.zone}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </details>
+        </div>
 
         {error && (
           <p className="anim-slide-down mt-2 text-sm text-red-600 dark:text-red-400">

@@ -187,10 +187,11 @@ export default function OverallStats({
               </div>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
-              {affectedList.map(({ ep, st }) => (
+              {affectedList.map(({ ep, st }, i) => (
                 <span
                   key={ep.key}
-                  className={`inline-flex items-center gap-2 rounded-md px-2.5 py-1 font-mono text-xs font-semibold ${
+                  style={{ animationDelay: `${150 + i * 45}ms` }}
+                  className={`anim-fade-up inline-flex items-center gap-2 rounded-md px-2.5 py-1 font-mono text-xs font-semibold ${
                     overallState === "outage" ? "bg-white/15" : "bg-black/10"
                   }`}
                 >
