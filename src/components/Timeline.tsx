@@ -131,7 +131,7 @@ function OpRow({
             data-op={op.id}
             data-idx={i}
             data-status={s}
-            className={`anim-slot-pop h-full min-w-0 flex-1 hover:brightness-125 ${STATUS_BG[s]}`}
+            className={`${hourView ? "anim-slot-pop" : "anim-slot-fade"} h-full min-w-0 flex-1 hover:brightness-125 ${STATUS_BG[s]}`}
             style={{ animationDelay: `${revealDelay + i * (hourView ? 35 : 2)}ms` }}
           />
         ))}

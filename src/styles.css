@@ -73,6 +73,15 @@
     transform: scaleY(0.1);
   }
 }
+/* Day view fade variant: opacity only. Scaling tiny 2-3px bars on the
+   compositor renders them slightly soft, and de-promoting the layer when the
+   animation ends visibly "sharpens" everything at once. Keeping geometry
+   fixed avoids that rasterization snap. */
+@keyframes slot-fade {
+  from {
+    opacity: 0;
+  }
+}
 @keyframes pop-in {
   0% {
     opacity: 0;
@@ -127,11 +136,15 @@
 .anim-slot-pop {
   animation: slot-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
+.anim-slot-fade {
+  animation: slot-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
 
 /* Hold the timeline cascade until it scrolls into view; Timeline.tsx removes
    this class via IntersectionObserver. Paused also freezes the delay phase,
    so bars stay invisible and the stagger starts on release. */
 .anim-hold .anim-slot-pop,
+.anim-hold .anim-slot-fade,
 .anim-hold .anim-row-sheen::after {
   animation-play-state: paused;
 }
