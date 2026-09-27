@@ -105,7 +105,9 @@ function OpRow({
     "operational",
   );
   return (
-    <div className="grid grid-cols-[150px_1fr_58px] items-center gap-3 py-1 [content-visibility:auto] [contain-intrinsic-size:auto_36px] sm:grid-cols-[220px_1fr_64px]">
+    // No content-visibility here: it defers animation application on
+    // off-screen rows, making the cascade pop in when scrolled later.
+    <div className="grid grid-cols-[150px_1fr_58px] items-center gap-3 py-1 sm:grid-cols-[220px_1fr_64px]">
       <span
         className={`truncate font-mono text-xs sm:text-[13px] ${
           worstStatus === "operational"
