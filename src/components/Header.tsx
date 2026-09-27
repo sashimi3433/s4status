@@ -101,7 +101,7 @@ export default function Header({ overall }: { overall: StatusCode }) {
           </a>
 
           <a
-            href="/docs"
+            href={lang === "en" ? "/docs" : `/docs?lang=${lang}`}
             title="API"
             className="rounded-md px-2 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
           >

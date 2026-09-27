@@ -1,7 +1,7 @@
 import { useI18n } from "../lib/i18n";
 
 export default function Footer() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   return (
     <footer className="anim-fade-in mt-12 border-t border-zinc-200 dark:border-zinc-800" style={{ animationDelay: "150ms" }}>
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-xs text-zinc-500 dark:text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
@@ -12,7 +12,10 @@ export default function Footer() {
           <p className="max-w-xl leading-relaxed">{t("footer.disclaimer")}</p>
         </div>
         <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row sm:gap-4 sm:self-center">
-          <a className="hover:text-zinc-800 dark:hover:text-zinc-200" href="/docs">
+          <a
+            className="hover:text-zinc-800 dark:hover:text-zinc-200"
+            href={lang === "en" ? "/docs" : `/docs?lang=${lang}`}
+          >
             API
           </a>
           <a

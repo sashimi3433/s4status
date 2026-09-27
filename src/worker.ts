@@ -9,7 +9,7 @@ import {
   endpointWorstDay,
   toDateStr,
 } from "./data/mock";
-import { OPENAPI_SPEC } from "./api/openapi";
+import { openapiSpec } from "./api/openapi";
 
 // ---------------------------------------------------------------------------
 // Rate limiting: 100 requests / minute / IP across all /api/* endpoints.
@@ -210,10 +210,12 @@ async function handleSubscribe(request: Request): Promise<Response> {
   return json({ ok: true, email, services }, 201);
 }
 
-/** Scalar API reference (loads the OpenAPI spec from /api/openapi.json). */
-function docsPage(): Response {
+/** Scalar API reference (loads the OpenAPI spec from /api/openapi.json,
+ *  with a Japanese spec when ?lang=ja is given). */
+function docsPage(lang: string | null): Response {
+  const specUrl = lang === "ja" ? "/api/openapi.json?lang=ja" : "/api/openapi.json";
   const html = `<!doctype html>
-<html lang="en">
+<html lang="${lang === "ja" ? "ja" : "en"}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -222,7 +224,7 @@ function docsPage(): Response {
   <style>body { margin: 0; }</style>
 </head>
 <body>
-  <script id="api-reference" data-url="/api/openapi.json"></script>
+  <script id="api-reference" data-url="${specUrl}"></script>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`;
@@ -240,7 +242,7 @@ export default {
     const url = new URL(request.url);
     const now = new Date();
 
-    if (url.pathname === "/docs") return docsPage();
+    if (url.pathname === "/docs") return docsPage(url.searchParams.get("lang"));
     if (url.pathname === "/robots.txt") {
       return new Response("User-agent: *\nAllow: /\n", { headers: { "Content-Type": "text/plain" } });
     }
@@ -254,7 +256,7 @@ export default {
       const rate = rateLimit(ip);
 
       if (url.pathname === "/api/openapi.json") {
-        return json(OPENAPI_SPEC, 200, rate);
+        return json(openapiSpec(url.searchParams.get("lang")), 200, rate);
       }
       if (!rate.ok) {
         return json({ error: "rate limit exceeded (100 requests/minute)" }, 429, rate);
