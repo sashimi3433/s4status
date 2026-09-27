@@ -3,12 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href="https://s4status.sessapps.com/" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#09090b" />
     <meta
       name="description"
-      content="Unofficial status page for MEGA S4 (S3-compatible object storage) and its IAM API."
+      content="MEGA S4(S3互換オブジェクトストレージ)と IAM API の非公式ステータスページ。28エンドポイント・34操作を5分ごとに監視し、障害・稼働状況をタイムラインで表示。Unofficial status page for MEGA S4 and its IAM API."
     />
-    <title>MEGA S4 Status (unofficial)</title>
+    <title>MEGA S4 Status (unofficial) — MEGA S4 &amp; IAM API ステータスモニタ</title>
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="MEGA S4 Status" />
     <meta property="og:title" content="MEGA S4 Status (unofficial)" />
@@ -21,6 +24,14 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="MEGA S4 Status — timeline of green, yellow and red status bars" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+    <meta property="og:locale:alternate" content="ko_KR" />
+    <meta property="og:locale:alternate" content="es_ES" />
+    <meta property="og:locale:alternate" content="fr_FR" />
+    <meta property="og:locale:alternate" content="de_DE" />
+    <meta property="og:locale:alternate" content="nl_NL" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MEGA S4 Status (unofficial)" />
     <meta
@@ -28,6 +39,23 @@
       content="Unofficial status monitor for MEGA S4 (S3-compatible object storage) and its IAM API."
     />
     <meta name="twitter:image" content="https://s4status.sessapps.com/ogp.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "MEGA S4 Status",
+        "alternateName": "MEGA S4 Status (unofficial)",
+        "url": "https://s4status.sessapps.com/",
+        "description": "Unofficial status monitor for MEGA S4 (S3-compatible object storage) and its IAM API: 28 endpoints and 34 API operations checked every 5 minutes.",
+        "inLanguage": ["ja", "en", "zh", "ko", "es", "fr", "de", "nl"],
+        "publisher": {
+          "@type": "Organization",
+          "name": "S4Status",
+          "url": "https://github.com/sashimi3433/s4status",
+          "email": "contact@sessapps.com"
+        }
+      }
+    </script>
     <script>
       // Apply persisted theme before first paint to avoid flashing.
       (() => {
@@ -45,6 +73,25 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="max-width: 40rem; margin: 4rem auto; padding: 0 1rem; font-family: system-ui, sans-serif; color: #18181b">
+        <h1 style="font-size: 1.5rem">MEGA S4 Status (unofficial)</h1>
+        <p>
+          MEGA S4(S3互換オブジェクトストレージ)と IAM API の非公式ステータスページです。
+          7都市×2ゾーン×S3/IAMの28エンドポイント、34のAPI操作を5分ごとに監視し、
+          障害・稼働状況をタイムラインで表示します。このページを利用するには JavaScript を有効にしてください。
+        </p>
+        <p style="font-size: 0.9rem; color: #52525b">
+          Unofficial status page for MEGA S4 (S3-compatible object storage) and its IAM API.
+          Please enable JavaScript to view live status.
+        </p>
+        <ul style="font-size: 0.9rem">
+          <li><a href="/docs">API documentation</a></li>
+          <li><a href="https://github.com/sashimi3433/s4status">GitHub</a></li>
+          <li><a href="mailto:contact@sessapps.com">contact@sessapps.com</a></li>
+        </ul>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

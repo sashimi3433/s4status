@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://s4status.sessapps.com/</loc>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://s4status.sessapps.com/?lang=ja"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://s4status.sessapps.com/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://s4status.sessapps.com/?lang=zh"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://s4status.sessapps.com/?lang=ko"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://s4status.sessapps.com/?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://s4status.sessapps.com/?lang=fr"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://s4status.sessapps.com/?lang=de"/>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://s4status.sessapps.com/?lang=nl"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://s4status.sessapps.com/"/>
+  </url>
+  <url>
+    <loc>https://s4status.sessapps.com/docs</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://s4status.sessapps.com/docs?lang=ja"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://s4status.sessapps.com/docs"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://s4status.sessapps.com/docs"/>
+  </url>
+</urlset>

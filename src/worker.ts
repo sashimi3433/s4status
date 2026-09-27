@@ -457,7 +457,10 @@ export default {
 
     if (url.pathname === "/docs") return docsPage(url.searchParams.get("lang"));
     if (url.pathname === "/robots.txt") {
-      return new Response("User-agent: *\nAllow: /\n", { headers: { "Content-Type": "text/plain" } });
+      return new Response(
+        "User-agent: *\nAllow: /\nAllow: /docs\nDisallow: /api/\n\nSitemap: https://s4status.sessapps.com/sitemap.xml\n",
+        { headers: { "Content-Type": "text/plain" } },
+      );
     }
 
     if (url.pathname.startsWith("/api/")) {
