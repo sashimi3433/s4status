@@ -79,7 +79,6 @@ const ja = {
   "subscribe.invalid": "有効なメールアドレスを入力してください。",
   "footer.disclaimer":
     "本サイトは MEGA S4 の非公式ステータスモニタです。MEGA / MEGA S4 とは無関係であり、公式のステータス情報ではありません。",
-  "footer.poweredBy": "Cloudflare Workers で配信",
   "footer.resources": "リソース",
   "footer.about": "サイト情報",
   "footer.privacy": "プライバシーポリシー",
@@ -156,7 +155,6 @@ const en = {
   "subscribe.invalid": "Please enter a valid email address.",
   "footer.disclaimer":
     "This is an unofficial status monitor for MEGA S4. It is not affiliated with MEGA and is not an official source of status information.",
-  "footer.poweredBy": "Served by Cloudflare Workers",
   "footer.resources": "Resources",
   "footer.about": "About",
   "footer.privacy": "Privacy Policy",
@@ -233,7 +231,6 @@ const zh = {
   "subscribe.invalid": "请输入有效的电子邮箱地址。",
   "footer.disclaimer":
     "本网站是非官方的 MEGA S4 状态监控页面,与 MEGA 无关,也不代表官方状态信息。",
-  "footer.poweredBy": "由 Cloudflare Workers 提供服务",
   "footer.resources": "相关资源",
   "footer.about": "关于",
   "footer.privacy": "隐私政策",
@@ -310,7 +307,6 @@ const ko = {
   "subscribe.invalid": "유효한 이메일 주소를 입력하세요.",
   "footer.disclaimer":
     "본 사이트는 MEGA S4의 비공식 상태 모니터이며 MEGA와 무관하고 공식 상태 정보가 아닙니다.",
-  "footer.poweredBy": "Cloudflare Workers로 제공",
   "footer.resources": "리소스",
   "footer.about": "사이트 정보",
   "footer.privacy": "개인정보 처리방침",
@@ -387,7 +383,6 @@ const es = {
   "subscribe.invalid": "Introduce una dirección de correo válida.",
   "footer.disclaimer":
     "Este es un monitor de estado no oficial de MEGA S4. No está afiliado a MEGA y no es una fuente oficial de información de estado.",
-  "footer.poweredBy": "Servido por Cloudflare Workers",
   "footer.resources": "Recursos",
   "footer.about": "Acerca de",
   "footer.privacy": "Política de privacidad",
@@ -464,7 +459,6 @@ const fr = {
   "subscribe.invalid": "Veuillez saisir une adresse e-mail valide.",
   "footer.disclaimer":
     "Ceci est un moniteur d'état non officiel de MEGA S4. Il n'est pas affilié à MEGA et ne remplace pas les informations officielles.",
-  "footer.poweredBy": "Propulsé par Cloudflare Workers",
   "footer.resources": "Ressources",
   "footer.about": "À propos",
   "footer.privacy": "Politique de confidentialité",
@@ -541,7 +535,6 @@ const de = {
   "subscribe.invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
   "footer.disclaimer":
     "Dies ist ein inoffizieller Statusmonitor für MEGA S4. Er steht in keiner Verbindung zu MEGA und ist keine offizielle Statusquelle.",
-  "footer.poweredBy": "Bereitgestellt über Cloudflare Workers",
   "footer.resources": "Ressourcen",
   "footer.about": "Über",
   "footer.privacy": "Datenschutzerklärung",
@@ -618,7 +611,6 @@ const nl = {
   "subscribe.invalid": "Voer een geldig e-mailadres in.",
   "footer.disclaimer":
     "Dit is een niet-officiële statusmonitor voor MEGA S4. Deze is niet verbonden met MEGA en is geen officiële bron van statusinformatie.",
-  "footer.poweredBy": "Aangeboden door Cloudflare Workers",
   "footer.resources": "Bronnen",
   "footer.about": "Over",
   "footer.privacy": "Privacybeleid",
