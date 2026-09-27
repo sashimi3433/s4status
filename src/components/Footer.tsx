@@ -106,7 +106,6 @@ export default function Footer() {
       <div className="border-t border-zinc-200 dark:border-zinc-800">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">
           <span>© {new Date().getFullYear()} MEGA S4 Status (unofficial)</span>
-          <span>{t("footer.poweredBy")}</span>
         </div>
       </div>
     </footer>

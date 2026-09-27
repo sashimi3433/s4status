@@ -204,20 +204,9 @@ export default function OverallStats({
       )}
 
       {/* Endpoint cards */}
-      <div className="mt-5 flex items-center justify-between">
-        <h2 className="anim-fade-up text-sm font-semibold text-zinc-500 dark:text-zinc-400" style={{ animationDelay: "80ms" }}>
-          {t("stats.endpoints")}
-        </h2>
-        {selected !== "all" && (
-          <button
-            type="button"
-            onClick={() => onSelect("all")}
-            className="flex items-center gap-1 rounded-full border border-zinc-300 px-2.5 py-0.5 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            {t("timeline.allEndpoints")} ✕
-          </button>
-        )}
-      </div>
+      <h2 className="anim-fade-up text-sm font-semibold text-zinc-500 dark:text-zinc-400" style={{ animationDelay: "80ms" }}>
+        {t("stats.endpoints")}
+      </h2>
 
       <div className="mt-3 space-y-5">
         {CITY_GROUPS.map((group, gi) => {

@@ -51,8 +51,9 @@ export default function App() {
     return acc;
   }, [statuses]);
 
+  // Clicking the selected endpoint card again clears the filter.
   const selectEndpoint = (key: string) => {
-    setSelectedEndpoint(key);
+    setSelectedEndpoint((prev) => (prev === key ? "all" : key));
     document.getElementById("timeline")?.scrollIntoView({ behavior: "smooth" });
   };
 
