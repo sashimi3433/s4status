@@ -550,6 +550,10 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
       q: "通知メールには何が届きますか?",
       a: "監視対象エンドポイントでの障害の発生・解消、および重大な障害のまとめをお知らせします。S3・IAMのいずれかのみを購読することも可能です。",
     },
+    {
+      q: "APIはありますか?",
+      a: "はい。このページのすべてのステータス情報はAPIから取得できます(認証不要、レートリミットは1分間に100リクエスト)。インタラクティブなドキュメントは /docs でご覧いただけます。",
+    },
   ],
   en: [
     {
@@ -575,6 +579,10 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     {
       q: "What will the notification emails contain?",
       a: "Incident start and resolution notifications for monitored endpoints, plus summaries of major incidents. You can subscribe to S3 and/or IAM separately.",
+    },
+    {
+      q: "Is there an API?",
+      a: "Yes. All status data shown on this page is available through a public API (no authentication required; rate limit: 100 requests per minute). See the interactive documentation at /docs.",
     },
   ],
   zh: [
@@ -602,6 +610,10 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
       q: "通知邮件包含什么内容?",
       a: "监控端点的故障开始与恢复通知,以及重大事件的汇总。您可以分别订阅 S3 和/或 IAM。",
     },
+    {
+      q: "有API吗?",
+      a: "有。本页面显示的所有状态信息均可通过公开API获取(无需认证,速率限制为每分钟100次请求)。交互式文档请见 /docs。",
+    },
   ],
   ko: [
     {
@@ -627,6 +639,10 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     {
       q: "알림 이메일에는 무엇이 오나요?",
       a: "모니터링 대상 엔드포인트의 장애 발생·해결 알림과 주요 사건 요약이 전송됩니다. S3와 IAM을 각각 선택해 구독할 수 있습니다.",
+    },
+    {
+      q: "API가 있나요?",
+      a: "네. 이 페이지의 모든 상태 정보는 공개 API로 가져올 수 있습니다(인증 불필요, 분당 100요청 제한). 대화형 문서는 /docs에서 확인할 수 있습니다.",
     },
   ],
   es: [
@@ -654,6 +670,10 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
       q: "¿Qué contendrán los correos de notificación?",
       a: "Avisos de inicio y resolución de incidencias en los endpoints monitorizados, además de resúmenes de incidentes importantes. Puedes suscribirte a S3 y/o IAM por separado.",
     },
+    {
+      q: "¿Hay una API?",
+      a: "Sí. Todos los datos de estado de esta página están disponibles mediante una API pública (sin autenticación; límite de 100 solicitudes por minuto). Consulta la documentación interactiva en /docs.",
+    },
   ],
   fr: [
     {
@@ -679,6 +699,10 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     {
       q: "Que contiendront les e-mails de notification ?",
       a: "Les débuts et résolutions d'incidents sur les endpoints surveillés, ainsi que des résumés des incidents majeurs. Vous pouvez vous abonner séparément à S3 et/ou IAM.",
+    },
+    {
+      q: "Y a-t-il une API ?",
+      a: "Oui. Toutes les données d'état affichées sur cette page sont accessibles via une API publique (sans authentification ; limite de 100 requêtes par minute). Consultez la documentation interactive sur /docs.",
     },
   ],
   de: [
@@ -706,6 +730,10 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
       q: "Was enthalten die Benachrichtigungs-E-Mails?",
       a: "Beginn und Behebung von Vorfällen auf überwachten Endpoints sowie Zusammenfassungen größerer Vorfälle. Sie können S3 und/oder IAM getrennt abonnieren.",
     },
+    {
+      q: "Gibt es eine API?",
+      a: "Ja. Alle auf dieser Seite angezeigten Statusdaten sind über eine öffentliche API abrufbar (keine Authentifizierung; Limit: 100 Anfragen pro Minute). Die interaktive Dokumentation finden Sie unter /docs.",
+    },
   ],
   nl: [
     {
@@ -731,6 +759,10 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     {
       q: "Wat bevatten de meldingsmails?",
       a: "Meldingen over het begin en het oplossen van incidenten op gemonitorde endpoints, plus samenvattingen van grote incidenten. U kunt zich apart op S3 en/of IAM abonneren.",
+    },
+    {
+      q: "Is er een API?",
+      a: "Ja. Alle statusgegevens op deze pagina zijn via een openbare API beschikbaar (geen authenticatie; limiet van 100 verzoeken per minuut). Bekijk de interactieve documentatie op /docs.",
     },
   ],
 };
