@@ -11,7 +11,25 @@ export default function Footer() {
           </p>
           <p className="max-w-xl leading-relaxed">{t("footer.disclaimer")}</p>
         </div>
-        <div className="flex shrink-0 gap-4">
+        <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row sm:gap-4 sm:self-center">
+          <a
+            className="flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-200"
+            href="mailto:contact@sessapps.com"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 7-10 6L2 7" />
+            </svg>
+            contact@sessapps.com
+          </a>
           <a
             className="flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-200"
             href="https://github.com/sashimi3433/s4status"
