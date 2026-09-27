@@ -6,7 +6,7 @@ export const OPENAPI_SPEC = {
     version: "1.0.0",
     description:
       "Status API for MEGA S4 (S3-compatible object storage) and its IAM API, " +
-      "served by https://s4status.sessapps.workers.dev .\n\n" +
+      "served by https://s4status.sessapps.com .\n\n" +
       "- **No authentication required** — all endpoints are public.\n" +
       "- **Rate limit: 100 requests / minute / IP** across all `/api/*` endpoints. " +
       "Responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining` and " +
