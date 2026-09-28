@@ -9,7 +9,7 @@
     "DB_BRIDGE_URL": "https://db.sessapps.com/sql"
   },
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": []
   },
   "d1_databases": [
     {
