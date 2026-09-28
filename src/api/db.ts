@@ -47,30 +47,19 @@ export class Db {
 let schemaReady = false;
 export async function ensureSchema(db: Db): Promise<void> {
   if (schemaReady) return;
+  // Single round-trip (each bridge call counts as a Worker subrequest)
   await db.query(`
     CREATE TABLE IF NOT EXISTS status_slots (
-      slot TEXT NOT NULL,
-      endpoint TEXT NOT NULL,
-      op TEXT NOT NULL,
-      status TEXT NOT NULL,
-      latency_ms INTEGER NOT NULL,
+      slot TEXT NOT NULL, endpoint TEXT NOT NULL, op TEXT NOT NULL,
+      status TEXT NOT NULL, latency_ms INTEGER NOT NULL,
       PRIMARY KEY (slot, endpoint, op)
-    )`);
-  await db.query(
-    "CREATE INDEX IF NOT EXISTS idx_status_slots_slot ON status_slots (slot)",
-  );
-  await db.query(`
+    );
+    CREATE INDEX IF NOT EXISTS idx_status_slots_slot ON status_slots (slot);
     CREATE TABLE IF NOT EXISTS subscriptions (
-      email TEXT PRIMARY KEY,
-      services TEXT NOT NULL,
-      regions TEXT NOT NULL,
-      endpoints TEXT NOT NULL,
-      token TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )`);
-  await db.query(
-    "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
-  );
+      email TEXT PRIMARY KEY, services TEXT NOT NULL, regions TEXT NOT NULL,
+      endpoints TEXT NOT NULL, token TEXT NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
   schemaReady = true;
 }

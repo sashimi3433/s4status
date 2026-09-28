@@ -264,12 +264,12 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
       policyArn = /<Arn>([^<]+)<\/Arn>/.exec(r.text)?.[1] ?? "";
     });
     if (policyArn) {
-      await safe("GetPolicy", async () =>
-        pushIam("GetPolicy", await iamFetch(creds, host, "GetPolicy", { PolicyArn: policyArn })));
-      await safe("GetPolicyVersion", async () => {
+      await safe("GetPolicy", async () => {
         const g = await iamFetch(creds, host, "GetPolicy", { PolicyArn: policyArn });
+        pushIam("GetPolicy", g);
         const versionId = /<DefaultVersionId>([^<]+)<\/DefaultVersionId>/.exec(g.text)?.[1] ?? "v1";
-        pushIam("GetPolicyVersion", await iamFetch(creds, host, "GetPolicyVersion", { PolicyArn: policyArn, VersionId: versionId }));
+        await safe("GetPolicyVersion", async () =>
+          pushIam("GetPolicyVersion", await iamFetch(creds, host, "GetPolicyVersion", { PolicyArn: policyArn, VersionId: versionId })));
       });
     }
     // User policy operations — use the probe user if configured; otherwise
