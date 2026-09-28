@@ -4,6 +4,7 @@
  */
 import { ENDPOINTS } from "../data/regions";
 import { sigv4Headers, bodyHash } from "./sigv4";
+import { Db, ensureSchema } from "./db";
 
 /** Runtime configuration (set as Worker secrets / plain-text variables). */
 declare global {
@@ -313,7 +314,7 @@ async function checkCanary(creds: Creds, firstS3Host: string): Promise<CheckResu
   return out;
 }
 
-export async function runChecks(env: Env): Promise<void> {
+export async function runChecks(env: Env, db: Db): Promise<void> {
   const accessKeyId = env.S4_ACCESS_KEY_ID;
   const secretAccessKey = env.S4_SECRET_ACCESS_KEY;
   if (!accessKeyId || !secretAccessKey) {
@@ -344,21 +345,20 @@ export async function runChecks(env: Env): Promise<void> {
     slice.push(...ENDPOINTS);
     includeCanary = true;
   } else {
-    const meta = await env.DB.prepare(
+    const metaRows = await db.query<{ key: string; value: string }>(
       "SELECT key, value FROM meta WHERE key IN ('s3cursor', 'iamcursor')",
-    ).all<{ key: string; value: string }>();
+    );
     const read = (k: string, len: number) =>
-      Number(meta.results.find((r) => r.key === k)?.value ?? 0) % len;
+      Number(metaRows.find((r) => r.key === k)?.value ?? 0) % len;
     const s3Cursor = read("s3cursor", s3List.length);
     const iamCursor = read("iamcursor", iamList.length);
     slice.push(s3List[s3Cursor]!);
     slice.push(iamList[iamCursor]!, iamList[(iamCursor + 1) % iamList.length]!);
     includeCanary = s3Cursor === 0;
-    await env.DB.prepare(
-      "INSERT OR REPLACE INTO meta (key, value) VALUES ('s3cursor', ?1), ('iamcursor', ?2)",
-    )
-      .bind(String((s3Cursor + 1) % s3List.length), String((iamCursor + 2) % iamList.length))
-      .run();
+    await db.query(
+      "INSERT INTO meta (key, value) VALUES ($1, $2), ($3, $4) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+      [String((s3Cursor + 1) % s3List.length), String((iamCursor + 2) % iamList.length)],
+    );
   }
 
   const results: CheckResult[] = [];
@@ -381,21 +381,17 @@ export async function runChecks(env: Env): Promise<void> {
   const now = new Date();
   const slot = slotKey(now);
   const rows = results.map((r) => [slot, r.endpoint, r.op, r.status, r.latencyMs] as const);
-  // D1 caps bound parameters per statement (~100): chunk rows.
-  for (let i = 0; i < rows.length; i += 19) {
-    const chunk = rows.slice(i, i + 19);
-    const values = chunk.map(() => "(?,?,?,?,?)").join(",");
-    const params = chunk.flat();
-    await env.DB.prepare(
-      `INSERT OR REPLACE INTO status_slots (slot, endpoint, op, status, latency_ms) VALUES ${values}`,
-    )
-      .bind(...params)
-      .run();
+  for (const [sl, ep2, op, st, ms] of rows) {
+    await db.query(
+      `INSERT INTO status_slots (slot, endpoint, op, status, latency_ms) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (slot, endpoint, op) DO UPDATE SET status = EXCLUDED.status, latency_ms = EXCLUDED.latency_ms`,
+      [sl, ep2, op, st, ms],
+    );
   }
 
   // 7-day retention (string compare on zero-padded keys)
   const cutoff = slotKey(new Date(now.getTime() - 7 * 24 * 3600 * 1000));
-  await env.DB.prepare("DELETE FROM status_slots WHERE slot < ?").bind(cutoff).run();
+  await db.query("DELETE FROM status_slots WHERE slot < $1", [cutoff]);
 
   const counts = results.reduce<Record<string, number>>((acc, r) => {
     acc[r.status] = (acc[r.status] ?? 0) + 1;
@@ -412,21 +408,6 @@ export function slotKey(d: Date): string {
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(minutes)}`;
 }
 
-export async function ensureStatusSchema(env: Env): Promise<void> {
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS status_slots (
-      slot TEXT NOT NULL,
-      endpoint TEXT NOT NULL,
-      op TEXT NOT NULL,
-      status TEXT NOT NULL,
-      latency_ms INTEGER NOT NULL,
-      PRIMARY KEY (slot, endpoint, op)
-    ) WITHOUT ROWID`,
-  ).run();
-  await env.DB.prepare(
-    "CREATE INDEX IF NOT EXISTS idx_status_slots_slot ON status_slots (slot)",
-  ).run();
-  await env.DB.prepare(
-    "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
-  ).run();
+export async function ensureStatusSchema(db: Db): Promise<void> {
+  await ensureSchema(db);
 }

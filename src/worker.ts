@@ -2,6 +2,7 @@ import { ENDPOINTS, REGIONS } from "./data/regions";
 import { OPERATIONS } from "./data/operations";
 import { SLOTS_PER_DAY, STATUS_OF, addDays, toDateStr } from "./data/mock";
 import { openapiSpec } from "./api/openapi";
+import { Db } from "./api/db";
 import { ensureStatusSchema, runChecks, slotKey } from "./api/checker";
 
 // ---------------------------------------------------------------------------
@@ -75,16 +76,15 @@ const WORST_SQL = `CASE status WHEN 'operational' THEN 0 WHEN 'degraded' THEN 1 
  * checks different endpoints at different minutes).
  */
 async function latestDataPerEndpoint(
-  env: Env,
+  db: Db,
   now: Date,
 ): Promise<Map<string, { op: string; status: string }[]>> {
-  await ensureStatusSchema(env);
+  await ensureStatusSchema(db);
   const since = slotKey(new Date(now.getTime() - 20 * 60_000));
-  const { results } = await env.DB.prepare(
-    "SELECT endpoint, op, status, slot FROM status_slots WHERE slot >= ? ORDER BY slot DESC",
-  )
-    .bind(since)
-    .all<{ endpoint: string; op: string; status: string; slot: string }>();
+  const results = await db.query<{ endpoint: string; op: string; status: string; slot: string }>(
+    "SELECT endpoint, op, status, slot FROM status_slots WHERE slot >= $1 ORDER BY slot DESC",
+    [since],
+  );
 
   // Each endpoint's ops share the same slot (checked as one chain), so the
   // first slot seen per endpoint in DESC order is that endpoint's latest.
@@ -108,10 +108,10 @@ async function latestDataPerEndpoint(
 
 /** Worst status per endpoint from each endpoint's own latest check. */
 async function currentStatusByEndpoint(
-  env: Env,
+  db: Db,
   now: Date,
 ): Promise<Map<string, string>> {
-  const perEp = await latestDataPerEndpoint(env, now);
+  const perEp = await latestDataPerEndpoint(db, now);
   const map = new Map<string, string>();
   for (const [ep, ops] of perEp) {
     let worst: string = "operational";
@@ -125,25 +125,24 @@ async function currentStatusByEndpoint(
   return map;
 }
 
-async function uptimeByEndpointToday(env: Env, now: Date): Promise<Map<string, number | null>> {
+async function uptimeByEndpointToday(db: Db, now: Date): Promise<Map<string, number | null>> {
   const start = slotKey(new Date(now.getTime() - 24 * 3600_000)); // trailing 24h
-  const r = await env.DB.prepare(
-    "SELECT endpoint, COUNT(*) AS total, SUM(status = 'operational') AS ok FROM status_slots WHERE slot >= ? GROUP BY endpoint",
-  )
-    .bind(start)
-    .all<{ endpoint: string; total: number; ok: number | null }>();
+  const r = await db.query<{ endpoint: string; total: number; ok: number | null }>(
+    "SELECT endpoint, COUNT(*) AS total, SUM(status = 'operational') AS ok FROM status_slots WHERE slot >= $1 GROUP BY endpoint",
+    [start],
+  );
   return new Map(
-    r.results.map((row) => [
+    r.map((row) => [
       row.endpoint,
       row.total ? Math.round((Number(row.ok ?? 0) / row.total) * 10000) / 100 : null,
     ]),
   );
 }
 
-async function endpointList(env: Env, now: Date) {
+async function endpointList(db: Db, now: Date) {
   const [statusMap, upMap] = await Promise.all([
-    currentStatusByEndpoint(env, now),
-    uptimeByEndpointToday(env, now),
+    currentStatusByEndpoint(db, now),
+    uptimeByEndpointToday(db, now),
   ]);
   return ENDPOINTS.map((ep) => {
     const region = REGIONS.find((r) => r.id === ep.regionId)!;
@@ -160,8 +159,8 @@ async function endpointList(env: Env, now: Date) {
   });
 }
 
-async function handleOverview(env: Env, now: Date): Promise<Response> {
-  const perEpData = await latestDataPerEndpoint(env, now);
+async function handleOverview(db: Db, now: Date): Promise<Response> {
+  const perEpData = await latestDataPerEndpoint(db, now);
   const statusMap = new Map<string, string>();
   for (const [ep, ops] of perEpData) {
     let worst: string = "operational";
@@ -172,7 +171,7 @@ async function handleOverview(env: Env, now: Date): Promise<Response> {
     }
     statusMap.set(ep, worst);
   }
-  const upMap = await uptimeByEndpointToday(env, now);
+  const upMap = await uptimeByEndpointToday(db, now);
   const endpoints = ENDPOINTS.map((ep) => {
     const region = REGIONS.find((r) => r.id === ep.regionId)!;
     return {
@@ -200,13 +199,12 @@ async function handleOverview(env: Env, now: Date): Promise<Response> {
   let incidentMinutes = 0;
   const since = `${addDays(toDateStr(now), -1)} 00:00`;
   for (const e of affected) {
-    const r = await env.DB.prepare(
-      `SELECT slot, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE endpoint = ?1 AND slot >= ?2 GROUP BY slot ORDER BY slot DESC LIMIT 288`,
-    )
-      .bind(e.key, since)
-      .all<{ slot: string; worst: number }>();
+    const r = await db.query<{ slot: string; worst: number }>(
+      `SELECT slot, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE endpoint = $1 AND slot >= $2 GROUP BY slot ORDER BY slot DESC LIMIT 288`,
+      [e.key, since],
+    );
     let run = 0;
-    for (const row of r.results) {
+    for (const row of r) {
       if (row.worst > 0) run++;
       else break;
     }
@@ -236,7 +234,7 @@ async function handleOverview(env: Env, now: Date): Promise<Response> {
   });
 }
 
-async function handleTimeline(url: URL, env: Env, now: Date): Promise<Response> {
+async function handleTimeline(url: URL, db: Db, now: Date): Promise<Response> {
   const todayStr = toDateStr(now);
   const minDate = addDays(todayStr, -6);
 
@@ -273,18 +271,19 @@ async function handleTimeline(url: URL, env: Env, now: Date): Promise<Response> 
   const startUtcMs = Date.parse(`${date}T00:00:00Z`) - tzMin * 60_000;
   const endUtcMs = startUtcMs + 86_400_000 - 1;
 
-  await ensureStatusSchema(env);
+  await ensureStatusSchema(db);
   const fromSlot = slotKey(new Date(startUtcMs));
   const toSlot = slotKey(new Date(endUtcMs));
-  const query =
+  const results =
     endpoint === "all"
-      ? env.DB.prepare(
-          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot >= ?1 AND slot <= ?2 GROUP BY slot, op`,
-        ).bind(fromSlot, toSlot)
-      : env.DB.prepare(
-          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot >= ?1 AND slot <= ?2 AND endpoint = ?3 GROUP BY slot, op`,
-        ).bind(fromSlot, toSlot, endpoint);
-  const { results } = await query.all<{ slot: string; op: string; worst: number }>();
+      ? await db.query<{ slot: string; op: string; worst: number }>(
+          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot >= $1 AND slot <= $2 GROUP BY slot, op`,
+          [fromSlot, toSlot],
+        )
+      : await db.query<{ slot: string; op: string; worst: number }>(
+          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot >= $1 AND slot <= $2 AND endpoint = $3 GROUP BY slot, op`,
+          [fromSlot, toSlot, endpoint],
+        );
 
   const byOp = new Map<string, Uint8Array>(
     OPERATIONS.map((op) => [op.id, new Uint8Array(SLOTS_PER_DAY).fill(3)]),
@@ -376,22 +375,6 @@ function rowToSub(r: SubRow): Subscription {
   };
 }
 
-let schemaReady = false;
-async function ensureSchema(env: Env): Promise<void> {
-  if (schemaReady) return;
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS subscriptions (
-      email TEXT PRIMARY KEY,
-      services TEXT NOT NULL,
-      regions TEXT NOT NULL,
-      endpoints TEXT NOT NULL,
-      token TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )`,
-  ).run();
-  schemaReady = true;
-}
 
 function tokenHex(): string {
   const bytes = new Uint8Array(32);
@@ -441,8 +424,8 @@ function subscriptionView(s: Subscription, origin: string) {
   };
 }
 
-async function handleSubscribe(request: Request, env: Env): Promise<Response> {
-  await ensureSchema(env);
+async function handleSubscribe(request: Request, db: Db): Promise<Response> {
+  await ensureStatusSchema(db);
   let body: unknown;
   try {
     body = await request.json();
@@ -455,21 +438,16 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
 
   const origin = new URL(request.url).origin;
   const now = new Date().toISOString();
-  const existing = await env.DB.prepare("SELECT * FROM subscriptions WHERE email = ?1")
-    .bind(email)
-    .first<SubRow>();
+  const existingRows = await db.query<SubRow>(
+    "SELECT * FROM subscriptions WHERE email = $1",
+    [email],
+  );
+  const existing = existingRows[0];
   if (existing) {
-    await env.DB.prepare(
-      "UPDATE subscriptions SET services = ?1, regions = ?2, endpoints = ?3, updated_at = ?4 WHERE email = ?5",
-    )
-      .bind(
-        JSON.stringify(services),
-        JSON.stringify(regions),
-        JSON.stringify(endpoints),
-        now,
-        email,
-      )
-      .run();
+    await db.query(
+      "UPDATE subscriptions SET services = $1, regions = $2, endpoints = $3, updated_at = $4 WHERE email = $5",
+      [JSON.stringify(services), JSON.stringify(regions), JSON.stringify(endpoints), now, email],
+    );
     const sub: Subscription = {
       email,
       services,
@@ -490,10 +468,9 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
     createdAt: now,
     updatedAt: now,
   };
-  await env.DB.prepare(
-    "INSERT INTO subscriptions (email, services, regions, endpoints, token, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-  )
-    .bind(
+  await db.query(
+    "INSERT INTO subscriptions (email, services, regions, endpoints, token, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    [
       email,
       JSON.stringify(services),
       JSON.stringify(regions),
@@ -501,19 +478,18 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
       sub.token,
       now,
       now,
-    )
-    .run();
+    ],
+  );
   return json({ ok: true, updated: false, subscription: subscriptionView(sub, origin) }, 201);
 }
 
-async function requireSubscription(url: URL, env: Env): Promise<Subscription | null> {
-  await ensureSchema(env);
+async function requireSubscription(url: URL, db: Db): Promise<Subscription | null> {
+  await ensureStatusSchema(db);
   const email = (url.searchParams.get("email") ?? "").trim().toLowerCase();
   const token = url.searchParams.get("token") ?? "";
   if (!email || !token) return null;
-  const row = await env.DB.prepare("SELECT * FROM subscriptions WHERE email = ?1")
-    .bind(email)
-    .first<SubRow>();
+  const rows = await db.query<SubRow>("SELECT * FROM subscriptions WHERE email = $1", [email]);
+  const row = rows[0];
   return row && row.token === token ? rowToSub(row) : null;
 }
 
@@ -521,8 +497,8 @@ const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** One-click unsubscribe landing page (linked from List-Unsubscribe headers). */
-async function handleUnsubscribePage(url: URL, env: Env): Promise<Response> {
-  const sub = await requireSubscription(url, env);
+async function handleUnsubscribePage(url: URL, db: Db): Promise<Response> {
+  const sub = await requireSubscription(url, db);
   const page = (title: string, body: string, status: number) =>
     new Response(
       `<!doctype html>
@@ -553,7 +529,7 @@ async function handleUnsubscribePage(url: URL, env: Env): Promise<Response> {
       404,
     );
   }
-  await env.DB.prepare("DELETE FROM subscriptions WHERE email = ?1").bind(sub.email).run();
+  await db.query("DELETE FROM subscriptions WHERE email = $1", [sub.email]);
   return page(
     "配信停止",
     `<h1>通知配信を停止しました</h1><p>Unsubscribed: ${escapeHtml(sub.email)}</p><p><a href="/">MEGA S4 Status に戻る</a></p>`,
@@ -625,6 +601,7 @@ export default {
       if (!rate.ok) {
         return json({ error: "rate limit exceeded (100 requests/minute)" }, 429, rate);
       }
+      const db = Db.fromEnv(env);
 
       if (
         request.method !== "GET" &&
@@ -637,27 +614,25 @@ export default {
 
       switch (url.pathname) {
         case "/api/overview":
-          return handleOverview(env, now);
+          return handleOverview(db, now);
         case "/api/endpoints":
-          return json({ count: ENDPOINTS.length, endpoints: await endpointList(env, now) }, 200, rate);
+          return json({ count: ENDPOINTS.length, endpoints: await endpointList(db, now) }, 200, rate);
         case "/api/operations":
           return json({ count: OPERATIONS.length, operations: OPERATIONS }, 200, rate);
         case "/api/timeline":
-          return handleTimeline(url, env, now);
+          return handleTimeline(url, db, now);
         case "/api/subscribe":
           if (request.method !== "POST") return json({ error: "method not allowed" }, 405, rate);
-          return handleSubscribe(request, env);
+          return handleSubscribe(request, db);
         case "/api/subscriptions":
           if (request.method !== "GET" && request.method !== "DELETE") {
             return json({ error: "method not allowed" }, 405, rate);
           }
           {
-            const sub = await requireSubscription(url, env);
+            const sub = await requireSubscription(url, db);
             if (!sub) return json({ error: "not found or invalid token" }, 404, rate);
             if (request.method === "DELETE") {
-              await env.DB.prepare("DELETE FROM subscriptions WHERE email = ?1")
-                .bind(sub.email)
-                .run();
+              await db.query("DELETE FROM subscriptions WHERE email = $1", [sub.email]);
               return json({ ok: true, unsubscribed: true, email: sub.email }, 200, rate);
             }
             return json(
@@ -680,13 +655,11 @@ export default {
                 ? ((body as { email: string }).email).trim().toLowerCase()
                 : "";
             if (!EMAIL_RE.test(email)) return badRequest("invalid email address");
-            await ensureSchema(env);
-            await env.DB.prepare("DELETE FROM subscriptions WHERE email = ?1")
-              .bind(email)
-              .run();
+            await ensureStatusSchema(db);
+            await db.query("DELETE FROM subscriptions WHERE email = $1", [email]);
             return json({ ok: true }, 200, rate);
           }
-          return handleUnsubscribePage(url, env);
+          return handleUnsubscribePage(url, db);
         default:
           return json({ error: "not found" }, 404, rate);
       }
@@ -698,11 +671,12 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    const db = Db.fromEnv(env);
     ctx.waitUntil(
       (async () => {
         try {
-          await ensureStatusSchema(env);
-          await runChecks(env);
+          await ensureStatusSchema(db);
+          await runChecks(env, db);
         } catch (e) {
           console.error("[checker] scheduled run failed:", e);
         }
