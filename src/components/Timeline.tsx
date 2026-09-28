@@ -255,7 +255,25 @@ export default function Timeline({
     });
 
   const onTrackMove = (e: ReactMouseEvent) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-idx]");
+    // Find the bar under the cursor. The flex gap-px between bars creates
+    // 1px dead zones where e.target is the container, not a bar — compute
+    // the index from the mouse X position so gaps never hide the tooltip.
+    let el = (e.target as HTMLElement).closest<HTMLElement>("[data-idx]");
+    if (!el || !el.dataset.op) {
+      const container = (e.target as HTMLElement).closest<HTMLElement>(".cursor-crosshair");
+      if (!container || !container.children.length) {
+        setTip(null);
+        setCross(null);
+        return;
+      }
+      const rect = container.getBoundingClientRect();
+      const barCount = container.children.length;
+      const idx = Math.max(
+        0,
+        Math.min(barCount - 1, Math.floor(((e.clientX - rect.left) / rect.width) * barCount)),
+      );
+      el = container.children[idx] as HTMLElement;
+    }
     if (!el || !el.dataset.op) {
       setTip(null);
       setCross(null);
