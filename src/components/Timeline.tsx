@@ -19,15 +19,7 @@ import {
   uptimePercent,
   type StatusCode,
 } from "../data/mock";
-import { useI18n, LANG_TZ, type Lang } from "../lib/i18n";
-
-function initialLang(): Lang {
-  try {
-    const q = new URLSearchParams(location.search).get("lang");
-    if (q === "ja" || q === "en" || q === "zh" || q === "ko" || q === "es" || q === "fr" || q === "de" || q === "nl") return q;
-  } catch {}
-  return navigator.language?.toLowerCase().split("-")[0] === "ja" ? "ja" : "en";
-}
+import { useI18n, LANG_TZ } from "../lib/i18n";
 import { STATUS_BG } from "../lib/statusStyles";
 
 interface Props {
@@ -37,7 +29,6 @@ interface Props {
   onDateChange: (d: string) => void;
   minDate: string;
   todayStr: string;
-  currentSlot: number;
 }
 
 interface Tip {
@@ -101,12 +92,10 @@ function OpRow({
   op,
   statuses,
   revealDelay,
-  hourView,
 }: {
   op: Operation;
   statuses: StatusCode[];
   revealDelay: number;
-  hourView: boolean;
 }) {
   const up = uptimePercent(statuses);
   const worstStatus = statuses.reduce<StatusCode>(
@@ -129,13 +118,13 @@ function OpRow({
       >
         {op.id}
       </span>
-      {/* Bars fade in one by one (hour view: 35ms stagger, day view: 2ms) and
-          a sheen sweeps the row after the cascade (day view). Opacity-only:
-          scaling bars on the compositor renders them slightly soft and
-          de-promoting the layer at animation end visibly "sharpens" them. */}
+      {/* Bars fade in one by one (2ms stagger) and a sheen sweeps the row
+          after the cascade. Opacity-only: scaling bars on the compositor
+          renders them slightly soft and de-promoting the layer at animation
+          end visibly "sharpens" them. */}
       <div
-        className={`flex h-7 cursor-crosshair gap-px overflow-hidden rounded-[3px]${hourView ? "" : " anim-row-sheen"}`}
-        style={hourView ? undefined : ({ "--rd": `${revealDelay}ms` } as CSSProperties)}
+        className="anim-row-sheen flex h-7 cursor-crosshair gap-px overflow-hidden rounded-[3px]"
+        style={{ "--rd": `${revealDelay}ms` } as CSSProperties}
       >
         {statuses.map((s, i) => (
           <div
@@ -144,7 +133,7 @@ function OpRow({
             data-idx={i}
             data-status={s}
             className={`anim-slot-fade h-full min-w-0 flex-1 hover:brightness-125 ${STATUS_BG[s]}`}
-            style={{ animationDelay: `${revealDelay + i * (hourView ? 35 : 2)}ms` }}
+            style={{ animationDelay: `${revealDelay + i * 2}ms` }}
           />
         ))}
       </div>
@@ -162,7 +151,6 @@ export default function Timeline({
   onDateChange,
   minDate,
   todayStr,
-  currentSlot,
 }: Props) {
   const { t, lang } = useI18n();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -170,20 +158,10 @@ export default function Timeline({
   // Vertical highlight column snapped to the hovered 5-minute slot
   const [cross, setCross] = useState<{ left: number; width: number } | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
-  // "all" = full day (288 slots); "0".."23" = zoom into one hour (12 slots).
-  // Defaults to the current hour in the UI language's timezone;
-  // ?hour=14 or ?hour=all overrides it.
-  const [hour, setHour] = useState<string>(() => {
-    const q = new URLSearchParams(location.search).get("hour");
-    if (q === "all") return "all";
-    if (q && /^[0-9]{1,2}$/.test(q) && Number(q) < 24) return String(Number(q));
-    const off = tzOffsetMinutes(LANG_TZ[initialLang()] ?? "UTC", new Date());
-    return String(new Date(Date.now() + off * 60_000).getUTCHours());
-  });
-
+  // Day view only (hour zoom removed: at ~15-min check intervals an hour
+  // window holds at most a handful of bars per endpoint).
   // Heavy re-renders (288 bars x 34 rows) are deferred so the selects and
   // buttons stay responsive while the timeline catches up.
-  const deferredHour = useDeferredValue(hour);
   const deferredDate = useDeferredValue(date);
   const deferredEndpoint = useDeferredValue(selectedEndpoint);
 
@@ -220,14 +198,6 @@ export default function Timeline({
     };
   }, [deferredDate, deferredEndpoint, lang]);
 
-  const slotRange = useMemo(
-    () =>
-      deferredHour === "all"
-        ? { start: 0, count: SLOTS_PER_DAY }
-        : { start: Number(deferredHour) * 12, count: 12 },
-    [deferredHour],
-  );
-
   const sections = useMemo(
     () =>
       OP_SECTIONS.map((section) => ({
@@ -235,14 +205,14 @@ export default function Timeline({
         group: section.group,
         rows: section.ops.map((op) => {
           const codes = dayCodes?.get(op.id);
-          const statuses: StatusCode[] = new Array(slotRange.count);
-          for (let i = 0; i < slotRange.count; i++) {
-            statuses[i] = STATUS_OF[codes ? codes[slotRange.start + i]! : 3]!;
+          const statuses: StatusCode[] = new Array(SLOTS_PER_DAY);
+          for (let i = 0; i < SLOTS_PER_DAY; i++) {
+            statuses[i] = STATUS_OF[codes ? codes[i]! : 3]!;
           }
           return { op, statuses };
         }),
       })),
-    [dayCodes, slotRange],
+    [dayCodes],
   );
 
   // Global row indices so the bar-reveal stagger flows across section borders.
@@ -275,7 +245,7 @@ export default function Timeline({
       x: e.clientX,
       y: e.clientY,
       op: el.dataset.op,
-      time: slotLabel(date, slotRange.start + Number(el.dataset.idx)),
+      time: slotLabel(date, Number(el.dataset.idx)),
       status: el.dataset.status as StatusCode,
     });
     const track = trackRef.current;
@@ -321,13 +291,9 @@ export default function Timeline({
     return v;
   };
 
-  // "Back to now" — shown whenever the view is not on the current moment
-  const currentHourStr = String(Math.floor(currentSlot / 12));
-  const isNowView = date === todayStr && hour === currentHourStr;
-  const backToNow = () => {
-    onDateChange(todayStr);
-    setHour(currentHourStr);
-  };
+  // "Back to now" — shown whenever the view is not on today
+  const isNowView = date === todayStr;
+  const backToNow = () => onDateChange(todayStr);
 
   const legend: { code: StatusCode; label: string }[] = [
     { code: "operational", label: t("status.operational") },
@@ -336,16 +302,6 @@ export default function Timeline({
     { code: "nodata", label: t("status.nodata") },
   ];
 
-  // Full day: label every 6 hours. Hour view: label every 5-minute slot.
-  const rulerLabels =
-    deferredHour === "all"
-      ? ["00:00", "06:00", "12:00", "18:00", "24:00"]
-      : Array.from({ length: 12 }, (_, i) => `:${String(i * 5).padStart(2, "0")}`);
-
-  const hourWindowLabel =
-    deferredHour === "all"
-      ? null
-      : `${deferredHour.padStart(2, "0")}:00\u2013${deferredHour.padStart(2, "0")}:59`;
 
   return (
     <section id="timeline" className="anim-fade-up mx-auto w-full max-w-6xl scroll-mt-20 px-4 pt-10">
@@ -376,23 +332,6 @@ export default function Timeline({
                     </option>
                   ))}
                 </optgroup>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {t("timeline.hour")}
-            <select
-              value={hour}
-              onChange={(e) => setHour(e.target.value)}
-              aria-label={t("timeline.hour")}
-              className="h-8 w-[112px] rounded-md border border-zinc-300 bg-white px-2 text-xs text-zinc-800 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-            >
-              <option value="all">{t("timeline.allDay")}</option>
-              {Array.from({ length: 24 }, (_, h) => (
-                <option key={h} value={String(h)}>
-                  {String(h).padStart(2, "0")}:00
-                </option>
               ))}
             </select>
           </label>
@@ -449,11 +388,6 @@ export default function Timeline({
             {l.label}
           </span>
         ))}
-        {hourWindowLabel && (
-          <span className="rounded-full border border-zinc-300 px-2 py-0.5 font-mono tabular-nums text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
-            {hourWindowLabel}
-          </span>
-        )}
       </div>
 
       {/* Rows */}
@@ -474,9 +408,11 @@ export default function Timeline({
           <div className="grid grid-cols-[150px_1fr_58px] gap-3 pb-2 sm:grid-cols-[220px_1fr_64px]">
             <span />
             <div className="flex justify-between text-[10px] tabular-nums text-zinc-400 dark:text-zinc-500">
-              {rulerLabels.map((l) => (
-                <span key={l}>{l}</span>
-              ))}
+              <span>00:00</span>
+              <span>06:00</span>
+              <span>12:00</span>
+              <span>18:00</span>
+              <span>24:00</span>
             </div>
             <span />
           </div>
@@ -509,12 +445,11 @@ export default function Timeline({
                     <div className="space-y-0.5">
                       {section.rows.map((row, ri) => (
                         <OpRow
-                          key={`${deferredEndpoint}|${deferredDate}|${deferredHour}|${row.op.id}`}
+                          key={`${deferredEndpoint}|${deferredDate}|${row.op.id}`}
                           op={row.op}
                           statuses={row.statuses}
                           revealDelay={220 + (rowOffsets[si]! + ri) * 22}
-                          hourView={deferredHour !== "all"}
-                        />
+                                                  />
                       ))}
                     </div>
                   </div>

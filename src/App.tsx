@@ -6,7 +6,7 @@ import Faq from "./components/Faq";
 import SubscribeForm from "./components/SubscribeForm";
 import Footer from "./components/Footer";
 import { Privacy, Terms } from "./components/Legal";
-import { addDays, todayInTz, slotOfDayInTz, tzOffsetMinutes, toDateStr, type StatusCode } from "./data/mock";
+import { addDays, todayInTz, tzOffsetMinutes, toDateStr, type StatusCode } from "./data/mock";
 import { LANG_TZ, useI18n } from "./lib/i18n";
 
 function toDateStrLocal(): string {
@@ -55,7 +55,6 @@ export default function App() {
   const { lang } = useI18n();
   const tzOff = useMemo(() => tzOffsetMinutes(LANG_TZ[lang] ?? "UTC", now), [lang, now]);
   const todayStr = todayInTz(now, tzOff);
-  const currentSlot = slotOfDayInTz(now, tzOff);
   const minDate = useMemo(() => addDays(todayStr, -6), [todayStr]);
 
   // Keep the selected date inside the viewable window as days roll over.
@@ -114,7 +113,6 @@ export default function App() {
               onDateChange={setSelectedDate}
               minDate={minDate}
               todayStr={todayStr}
-              currentSlot={currentSlot}
             />
             <Faq />
             <SubscribeForm />
