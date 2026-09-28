@@ -78,7 +78,7 @@ interface SlotRow {
 /** Rows of the most recent slot that has data (within the last 20 minutes). */
 async function latestSlotRows(env: Env, now: Date): Promise<SlotRow[]> {
   await ensureStatusSchema(env);
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 16; i++) {
     const s = slotKey(new Date(now.getTime() - i * 5 * 60_000));
     const r = await env.DB.prepare("SELECT endpoint, op, status FROM status_slots WHERE slot = ?")
       .bind(s)

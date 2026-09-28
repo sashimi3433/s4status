@@ -13,6 +13,7 @@ declare global {
     S4_PROBE_BUCKET?: string;
     S4_IAM_PROBE_USER?: string;
     S4_SIGV4_REGION?: string;
+    S4_FULL_SCAN?: string;
   }
 }
 
@@ -303,16 +304,37 @@ export async function runChecks(env: Env): Promise<void> {
   };
 
   diagSamples.length = 0;
-  // Free plan caps a Worker invocation at 50 subrequests, so each run checks
-  // a rotating slice of endpoints (2 per minute → full 28-endpoint cycle in
-  // ~14 minutes) instead of the whole matrix at once.
-  const TAKE = 2;
-  const cursorRow = await env.DB.prepare("SELECT value FROM meta WHERE key = 'cursor'")
-    .first<{ value: string }>();
-  const cursor = Number(cursorRow?.value ?? 0) % ENDPOINTS.length;
+  // The free plan caps a Worker invocation at ~50 subrequests, so each run
+  // checks a rotating slice (1 S3 chain ≈ 24 requests + 2 IAM chains ≈ 16)
+  // instead of the whole matrix. With a */5 cron the full 28-endpoint cycle
+  // takes ~70 min; with a per-minute cron ~14 min. Set S4_FULL_SCAN=1 on a
+  // paid plan (1000 subrequests) to check everything in one run.
+  const fullScan = env.S4_FULL_SCAN === "1";
+  const s3List = ENDPOINTS.filter((e) => e.service === "s3");
+  const iamList = ENDPOINTS.filter((e) => e.service === "iam");
+
   const slice: typeof ENDPOINTS = [];
-  for (let i = 0; i < TAKE; i++) slice.push(ENDPOINTS[(cursor + i) % ENDPOINTS.length]!);
-  const includeCanary = cursor === 0; // once per full cycle
+  let includeCanary = false;
+  if (fullScan) {
+    slice.push(...ENDPOINTS);
+    includeCanary = true;
+  } else {
+    const meta = await env.DB.prepare(
+      "SELECT key, value FROM meta WHERE key IN ('s3cursor', 'iamcursor')",
+    ).all<{ key: string; value: string }>();
+    const read = (k: string, len: number) =>
+      Number(meta.results.find((r) => r.key === k)?.value ?? 0) % len;
+    const s3Cursor = read("s3cursor", s3List.length);
+    const iamCursor = read("iamcursor", iamList.length);
+    slice.push(s3List[s3Cursor]!);
+    slice.push(iamList[iamCursor]!, iamList[(iamCursor + 1) % iamList.length]!);
+    includeCanary = s3Cursor === 0;
+    await env.DB.prepare(
+      "INSERT OR REPLACE INTO meta (key, value) VALUES ('s3cursor', ?1), ('iamcursor', ?2)",
+    )
+      .bind(String((s3Cursor + 1) % s3List.length), String((iamCursor + 2) % iamList.length))
+      .run();
+  }
 
   const results: CheckResult[] = [];
   for (const ep of slice) {
@@ -329,12 +351,6 @@ export async function runChecks(env: Env): Promise<void> {
       /* diag already covers */
     }
   }
-  const nextCursor = (cursor + TAKE) % ENDPOINTS.length;
-  await env.DB.prepare(
-    "INSERT OR REPLACE INTO meta (key, value) VALUES ('cursor', ?1)",
-  )
-    .bind(String(nextCursor))
-    .run();
   // Fill any missing op/endpoint cells as nodata-free (skip) — absent = nodata on read.
 
   const now = new Date();
