@@ -5,6 +5,9 @@
   "main": "src/worker.ts",
   "routes": [{ "pattern": "s4status.sessapps.com", "custom_domain": true }],
   "compatibility_date": "2026-09-25",
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "d1_databases": [
     {
       "binding": "DB",

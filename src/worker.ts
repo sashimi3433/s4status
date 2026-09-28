@@ -1,15 +1,8 @@
 import { ENDPOINTS, REGIONS } from "./data/regions";
 import { OPERATIONS } from "./data/operations";
-import {
-  SLOTS_PER_DAY,
-  STATUS_OF,
-  addDays,
-  currentSlotOf,
-  dayStatusCodes,
-  endpointWorstDay,
-  toDateStr,
-} from "./data/mock";
+import { SLOTS_PER_DAY, STATUS_OF, addDays, toDateStr } from "./data/mock";
 import { openapiSpec } from "./api/openapi";
+import { ensureStatusSchema, runChecks, slotKey } from "./api/checker";
 
 // ---------------------------------------------------------------------------
 // Rate limiting: 100 requests / minute / IP across all /api/* endpoints.
@@ -70,23 +63,66 @@ function json(data: unknown, status = 200, rate?: RateResult): Response {
 const badRequest = (msg: string) => json({ error: msg }, 400);
 
 // ---------------------------------------------------------------------------
-// Handlers
+// Status read path (D1)
 // ---------------------------------------------------------------------------
 
-function endpointList(now: Date) {
-  const todayStr = toDateStr(now);
-  const currentSlot = currentSlotOf(now);
+const ST_RANK = { operational: 0, degraded: 1, outage: 2 } as const;
+const WORST_SQL = `CASE status WHEN 'operational' THEN 0 WHEN 'degraded' THEN 1 ELSE 2 END`;
+
+interface SlotRow {
+  endpoint: string;
+  op: string;
+  status: string;
+}
+
+/** Rows of the most recent slot that has data (within the last 20 minutes). */
+async function latestSlotRows(env: Env, now: Date): Promise<SlotRow[]> {
+  await ensureStatusSchema(env);
+  for (let i = 0; i < 4; i++) {
+    const s = slotKey(new Date(now.getTime() - i * 5 * 60_000));
+    const r = await env.DB.prepare("SELECT endpoint, op, status FROM status_slots WHERE slot = ?")
+      .bind(s)
+      .all<SlotRow>();
+    if (r.results.length > 0) return r.results;
+  }
+  return [];
+}
+
+/** Worst status per endpoint for the latest measured slot. */
+async function currentStatusByEndpoint(env: Env, now: Date): Promise<Map<string, string>> {
+  const rows = await latestSlotRows(env, now);
+  const map = new Map<string, string>();
+  for (const r of rows) {
+    const cur = map.get(r.endpoint);
+    if (!cur || ST_RANK[r.status as keyof typeof ST_RANK] > ST_RANK[cur as keyof typeof ST_RANK]) {
+      map.set(r.endpoint, r.status);
+    }
+  }
+  return map;
+}
+
+async function uptimeByEndpointToday(env: Env, now: Date): Promise<Map<string, number | null>> {
+  const start = `${toDateStr(now)} 00:00`;
+  const r = await env.DB.prepare(
+    "SELECT endpoint, COUNT(*) AS total, SUM(status = 'operational') AS ok FROM status_slots WHERE slot >= ? GROUP BY endpoint",
+  )
+    .bind(start)
+    .all<{ endpoint: string; total: number; ok: number | null }>();
+  return new Map(
+    r.results.map((row) => [
+      row.endpoint,
+      row.total ? Math.round((Number(row.ok ?? 0) / row.total) * 10000) / 100 : null,
+    ]),
+  );
+}
+
+async function endpointList(env: Env, now: Date) {
+  const [statusMap, upMap] = await Promise.all([
+    currentStatusByEndpoint(env, now),
+    uptimeByEndpointToday(env, now),
+  ]);
   return ENDPOINTS.map((ep) => {
     const region = REGIONS.find((r) => r.id === ep.regionId)!;
-    const codes = endpointWorstDay(ep.key, todayStr, todayStr, currentSlot);
-    let measured = 0;
-    let ok = 0;
-    for (let s = 0; s <= currentSlot; s++) {
-      const c = codes[s]!;
-      if (c === 3) continue;
-      measured++;
-      if (c === 0) ok++;
-    }
     return {
       key: ep.key,
       service: ep.service,
@@ -94,24 +130,65 @@ function endpointList(now: Date) {
       city: region.city,
       zone: region.zone,
       url: ep.url,
-      status: STATUS_OF[codes[currentSlot]!]!,
-      uptime24h: measured === 0 ? null : Math.round((ok / measured) * 10000) / 100,
+      status: statusMap.get(ep.key) ?? "nodata",
+      uptime24h: upMap.get(ep.key) ?? null,
     };
   });
 }
 
-function handleOverview(now: Date): Response {
-  const endpoints = endpointList(now);
-  const overall = endpoints.reduce<string>((acc, ep) => {
-    if (ep.status === "outage") return "outage";
-    return ep.status === "degraded" && acc !== "outage" ? "degraded" : acc;
-  }, "operational");
-  const rank = { operational: 0, degraded: 1, outage: 2, nodata: 0 } as const;
-  const affected = endpoints.filter((ep) => rank[ep.status as keyof typeof rank] > 0).length;
+async function handleOverview(env: Env, now: Date): Promise<Response> {
+  const rows = await latestSlotRows(env, now);
+  const statusMap = await currentStatusByEndpoint(env, now);
+  const upMap = await uptimeByEndpointToday(env, now);
+  const endpoints = ENDPOINTS.map((ep) => {
+    const region = REGIONS.find((r) => r.id === ep.regionId)!;
+    return {
+      key: ep.key,
+      service: ep.service,
+      region: ep.regionId,
+      city: region.city,
+      zone: region.zone,
+      url: ep.url,
+      status: statusMap.get(ep.key) ?? "nodata",
+      uptime24h: upMap.get(ep.key) ?? null,
+    };
+  });
+
+  const affected = endpoints.filter((e) => e.status === "degraded" || e.status === "outage");
+  const overall = affected.some((e) => e.status === "outage")
+    ? "outage"
+    : affected.length > 0
+      ? "degraded"
+      : rows.length > 0
+        ? "operational"
+        : "nodata";
+
+  // Longest contiguous non-operational tail (up to 24h back) per affected endpoint
+  let incidentMinutes = 0;
+  const since = `${addDays(toDateStr(now), -1)} 00:00`;
+  for (const e of affected) {
+    const r = await env.DB.prepare(
+      `SELECT slot, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE endpoint = ?1 AND slot >= ?2 GROUP BY slot ORDER BY slot DESC LIMIT 288`,
+    )
+      .bind(e.key, since)
+      .all<{ slot: string; worst: number }>();
+    let run = 0;
+    for (const row of r.results) {
+      if (row.worst > 0) run++;
+      else break;
+    }
+    incidentMinutes = Math.max(incidentMinutes, run * 5);
+  }
+  const affectedOperations = new Set(
+    rows.filter((r) => r.status !== "operational").map((r) => r.op),
+  ).size;
+
   return json({
     generatedAt: now.toISOString(),
     overall,
-    affectedEndpoints: affected,
+    affectedEndpoints: affected.length,
+    incidentMinutes,
+    affectedOperations,
     slotMinutes: 5,
     historyDays: 7,
     operationCount: OPERATIONS.length,
@@ -120,9 +197,8 @@ function handleOverview(now: Date): Response {
   });
 }
 
-function handleTimeline(url: URL, now: Date): Response {
+async function handleTimeline(url: URL, env: Env, now: Date): Promise<Response> {
   const todayStr = toDateStr(now);
-  const currentSlot = currentSlotOf(now);
   const minDate = addDays(todayStr, -6);
 
   let date = url.searchParams.get("date") ?? todayStr;
@@ -151,8 +227,31 @@ function handleTimeline(url: URL, now: Date): Response {
     slotCount = 12;
   }
 
+  await ensureStatusSchema(env);
+  const like = `${date} %`;
+  const query =
+    endpoint === "all"
+      ? env.DB.prepare(
+          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot LIKE ?1 GROUP BY slot, op`,
+        ).bind(like)
+      : env.DB.prepare(
+          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot LIKE ?1 AND endpoint = ?2 GROUP BY slot, op`,
+        ).bind(like, endpoint);
+  const { results } = await query.all<{ slot: string; op: string; worst: number }>();
+
+  const byOp = new Map<string, Uint8Array>(
+    OPERATIONS.map((op) => [op.id, new Uint8Array(SLOTS_PER_DAY).fill(3)]),
+  );
+  for (const row of results) {
+    const hh = Number(row.slot.slice(11, 13));
+    const mm = Number(row.slot.slice(14, 16));
+    const idx = (hh * 60 + mm) / 5;
+    const arr = byOp.get(row.op);
+    if (arr && idx >= 0 && idx < SLOTS_PER_DAY) arr[idx] = row.worst;
+  }
+
   const operations = OPERATIONS.map((op) => {
-    const codes = dayStatusCodes(op.id, endpoint, date, todayStr, currentSlot);
+    const codes = byOp.get(op.id)!;
     const slice = codes.subarray(slotStart, slotStart + slotCount);
     const statuses: string[] = [];
     let measured = 0;
@@ -489,13 +588,13 @@ export default {
 
       switch (url.pathname) {
         case "/api/overview":
-          return handleOverview(now);
+          return handleOverview(env, now);
         case "/api/endpoints":
-          return json({ count: ENDPOINTS.length, endpoints: endpointList(now) }, 200, rate);
+          return json({ count: ENDPOINTS.length, endpoints: await endpointList(env, now) }, 200, rate);
         case "/api/operations":
           return json({ count: OPERATIONS.length, operations: OPERATIONS }, 200, rate);
         case "/api/timeline":
-          return handleTimeline(url, now);
+          return handleTimeline(url, env, now);
         case "/api/subscribe":
           if (request.method !== "POST") return json({ error: "method not allowed" }, 405, rate);
           return handleSubscribe(request, env);
@@ -547,5 +646,18 @@ export default {
     // Any other path falls through to the static assets (SPA fallback via
     // not_found_handling, so deep links still serve index.html).
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      (async () => {
+        try {
+          await ensureStatusSchema(env);
+          await runChecks(env);
+        } catch (e) {
+          console.error("[checker] scheduled run failed:", e);
+        }
+      })(),
+    );
   },
 };

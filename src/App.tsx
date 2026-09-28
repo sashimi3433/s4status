@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import Header from "./components/Header";
-import OverallStats, {
-  computeEndpointStatuses,
-  computeEndpointUptimes,
-} from "./components/OverallStats";
+import OverallStats from "./components/OverallStats";
 import Timeline from "./components/Timeline";
 import Faq from "./components/Faq";
 import SubscribeForm from "./components/SubscribeForm";
 import Footer from "./components/Footer";
 import { Privacy, Terms } from "./components/Legal";
 import { addDays, currentSlotOf, toDateStr, type StatusCode } from "./data/mock";
+
+interface OverviewData {
+  overall: string;
+  affectedEndpoints: number;
+  incidentMinutes: number;
+  affectedOperations: number;
+  endpoints: { key: string; status: StatusCode; uptime24h: number | null }[];
+}
 
 export default function App() {
   const [now, setNow] = useState(() => new Date());
@@ -24,6 +29,22 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
+  // Live status from the public API (worker + D1, filled by the 5-min cron)
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/overview");
+        if (res.ok) setOverview((await res.json()) as OverviewData);
+      } catch {
+        /* keep last known */
+      }
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const todayStr = toDateStr(now);
   const currentSlot = currentSlotOf(now);
   const minDate = useMemo(() => addDays(todayStr, -6), [todayStr]);
@@ -34,12 +55,12 @@ export default function App() {
   }, [todayStr, minDate]);
 
   const statuses = useMemo(
-    () => computeEndpointStatuses(todayStr, currentSlot),
-    [todayStr, currentSlot],
+    () => new Map((overview?.endpoints ?? []).map((e) => [e.key, e.status])),
+    [overview],
   );
   const uptimes = useMemo(
-    () => computeEndpointUptimes(todayStr, currentSlot),
-    [todayStr, currentSlot],
+    () => new Map((overview?.endpoints ?? []).map((e) => [e.key, e.uptime24h])),
+    [overview],
   );
 
   const overall: StatusCode = useMemo(() => {
@@ -67,12 +88,12 @@ export default function App() {
           <Terms />
         ) : (
           <>
-        <OverallStats
-          statuses={statuses}
-          uptimes={uptimes}
-          todayStr={todayStr}
-          currentSlot={currentSlot}
-          lastChecked={lastChecked}
+            <OverallStats
+              statuses={statuses}
+              uptimes={uptimes}
+              incidentMinutes={overview?.incidentMinutes ?? 0}
+              affectedOpCount={overview?.affectedOperations ?? 0}
+              lastChecked={lastChecked}
               now={now}
               selected={selectedEndpoint}
               onSelect={selectEndpoint}

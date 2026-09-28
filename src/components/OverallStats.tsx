@@ -1,12 +1,6 @@
 import { ENDPOINTS, REGIONS } from "../data/regions";
 import { OPERATIONS } from "../data/operations";
-import {
-  dayStatusCodes,
-  endpointWorstDay,
-  STATUS_OF,
-  worst,
-  type StatusCode,
-} from "../data/mock";
+import { worst, type StatusCode } from "../data/mock";
 import { useI18n, type MessageKey } from "../lib/i18n";
 import { STATUS_CHIP_BG, STATUS_DOT, BANNER_BG } from "../lib/statusStyles";
 
@@ -26,48 +20,6 @@ function CheckIcon({ className }: { className?: string }) {
       <path d="m9 11 3 3L22 4" />
     </svg>
   );
-}
-
-/** Minutes since the endpoint left "operational" (contiguous tail of today). */
-function ongoingMinutes(epKey: string, todayStr: string, currentSlot: number): number {
-  const codes = endpointWorstDay(epKey, todayStr, todayStr, currentSlot);
-  let s = currentSlot;
-  while (s >= 0 && codes[s] !== 0) s--;
-  return (currentSlot - s) * 5;
-}
-
-/** Worst status across all operations, per endpoint, for the current slot. */
-export function computeEndpointStatuses(
-  todayStr: string,
-  currentSlot: number,
-): Map<string, StatusCode> {
-  const map = new Map<string, StatusCode>();
-  for (const ep of ENDPOINTS) {
-    const codes = endpointWorstDay(ep.key, todayStr, todayStr, currentSlot);
-    map.set(ep.key, STATUS_OF[codes[currentSlot]!]!);
-  }
-  return map;
-}
-
-/** Today's operational share (all operations × measured slots), per endpoint. */
-export function computeEndpointUptimes(
-  todayStr: string,
-  currentSlot: number,
-): Map<string, number | null> {
-  const map = new Map<string, number | null>();
-  for (const ep of ENDPOINTS) {
-    const codes = endpointWorstDay(ep.key, todayStr, todayStr, currentSlot);
-    let measured = 0;
-    let ok = 0;
-    for (let s = 0; s <= currentSlot; s++) {
-      const c = codes[s]!;
-      if (c === 3) continue; // nodata
-      measured++;
-      if (c === 0) ok++;
-    }
-    map.set(ep.key, measured === 0 ? null : (ok / measured) * 100);
-  }
-  return map;
 }
 
 function agoLabel(now: Date, last: Date, t: ReturnType<typeof useI18n>["t"]): string {
@@ -93,8 +45,8 @@ const CITY_GROUPS = (() => {
 interface Props {
   statuses: Map<string, StatusCode>;
   uptimes: Map<string, number | null>;
-  todayStr: string;
-  currentSlot: number;
+  incidentMinutes: number;
+  affectedOpCount: number;
   lastChecked: Date;
   now: Date;
   selected: string; // endpoint key or "all"
@@ -104,8 +56,8 @@ interface Props {
 export default function OverallStats({
   statuses,
   uptimes,
-  todayStr,
-  currentSlot,
+  incidentMinutes,
+  affectedOpCount,
   lastChecked,
   now,
   selected,
@@ -115,8 +67,8 @@ export default function OverallStats({
 
   const affectedList = ENDPOINTS.map((ep) => ({
     ep,
-    st: statuses.get(ep.key) ?? "operational",
-  })).filter((x) => x.st !== "operational");
+    st: statuses.get(ep.key) ?? "nodata",
+  })).filter((x) => x.st === "degraded" || x.st === "outage");
   const overallState: "operational" | "degraded" | "outage" = affectedList.some(
     (x) => x.st === "outage",
   )
@@ -127,24 +79,10 @@ export default function OverallStats({
   const allOk = overallState === "operational";
   const affected = affectedList.length;
 
-  // Longest ongoing incident across affected endpoints
-  const incidentMinutes = affectedList.reduce(
-    (max, { ep }) => Math.max(max, ongoingMinutes(ep.key, todayStr, currentSlot)),
-    0,
-  );
   const durationLabel =
     incidentMinutes >= 60
       ? t("stats.durationHour", { h: Math.round((incidentMinutes / 60) * 10) / 10 })
       : t("stats.durationMin", { m: incidentMinutes });
-
-  // Distinct operations currently failing on any affected endpoint
-  const affectedOpIds = new Set<string>();
-  for (const { ep } of affectedList) {
-    for (const op of OPERATIONS) {
-      const code = dayStatusCodes(op.id, ep.key, todayStr, todayStr, currentSlot)[currentSlot]!;
-      if (code !== 0) affectedOpIds.add(op.id);
-    }
-  }
 
   const regionName = (city: string) => t(`region.${city}` as MessageKey);
 
@@ -178,7 +116,7 @@ export default function OverallStats({
                 <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm opacity-90">
                   <span>{t("stats.affectedEndpoints", { n: affected })}</span>
                   <span>{durationLabel}</span>
-                  <span>{t("stats.affectedOperations", { n: affectedOpIds.size })}</span>
+                  <span>{t("stats.affectedOperations", { n: affectedOpCount })}</span>
                 </p>
               </div>
               <div className="hidden shrink-0 text-right text-xs opacity-75 sm:block">

@@ -11,9 +11,9 @@ import { OP_SECTIONS, type Operation } from "../data/operations";
 import { ENDPOINTS, REGIONS } from "../data/regions";
 import {
   SLOTS_PER_DAY,
+  CODE_OF,
   STATUS_OF,
   addDays,
-  dayStatusCodes,
   slotLabel,
   uptimePercent,
   type StatusCode,
@@ -162,12 +162,12 @@ export default function Timeline({
   const [cross, setCross] = useState<{ left: number; width: number } | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   // "all" = full day (288 slots); "0".."23" = zoom into one hour (12 slots).
-  // Defaults to the current hour; ?hour=14 or ?hour=all overrides it.
+  // Defaults to the current hour (UTC); ?hour=14 or ?hour=all overrides it.
   const [hour, setHour] = useState<string>(() => {
     const q = new URLSearchParams(location.search).get("hour");
     if (q === "all") return "all";
     if (q && /^[0-9]{1,2}$/.test(q) && Number(q) < 24) return String(Number(q));
-    return String(new Date().getHours());
+    return String(new Date().getUTCHours());
   });
 
   // Heavy re-renders (288 bars x 34 rows) are deferred so the selects and
@@ -175,6 +175,38 @@ export default function Timeline({
   const deferredHour = useDeferredValue(hour);
   const deferredDate = useDeferredValue(date);
   const deferredEndpoint = useDeferredValue(selectedEndpoint);
+
+  // Live day data from the public API (worker + D1, filled by the 5-min cron).
+  const [dayCodes, setDayCodes] = useState<Map<string, Uint8Array> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setDayCodes(null);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/timeline?date=${deferredDate}&endpoint=${encodeURIComponent(deferredEndpoint)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          operations: { id: string; statuses: string[] }[];
+        };
+        const map = new Map<string, Uint8Array>();
+        for (const row of data.operations) {
+          const arr = new Uint8Array(SLOTS_PER_DAY).fill(3);
+          for (let i = 0; i < SLOTS_PER_DAY; i++) {
+            arr[i] = CODE_OF[(row.statuses[i] ?? "nodata") as StatusCode];
+          }
+          map.set(row.id, arr);
+        }
+        if (!cancelled) setDayCodes(map);
+      } catch {
+        /* leave null → nodata */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deferredDate, deferredEndpoint]);
 
   const slotRange = useMemo(
     () =>
@@ -190,21 +222,15 @@ export default function Timeline({
         api: section.api,
         group: section.group,
         rows: section.ops.map((op) => {
-          const codes = dayStatusCodes(
-            op.id,
-            deferredEndpoint,
-            deferredDate,
-            todayStr,
-            currentSlot,
-          );
-          const statuses: StatusCode[] = Array.from(
-            codes.subarray(slotRange.start, slotRange.start + slotRange.count),
-            (c) => STATUS_OF[c]!,
-          );
+          const codes = dayCodes?.get(op.id);
+          const statuses: StatusCode[] = new Array(slotRange.count);
+          for (let i = 0; i < slotRange.count; i++) {
+            statuses[i] = STATUS_OF[codes ? codes[slotRange.start + i]! : 3]!;
+          }
           return { op, statuses };
         }),
       })),
-    [deferredEndpoint, deferredDate, todayStr, currentSlot, slotRange],
+    [dayCodes, slotRange],
   );
 
   // Global row indices so the bar-reveal stagger flows across section borders.
@@ -237,7 +263,7 @@ export default function Timeline({
       x: e.clientX,
       y: e.clientY,
       op: el.dataset.op,
-      time: slotLabel(date, slotRange.start + Number(el.dataset.idx)),
+      time: `${slotLabel(date, slotRange.start + Number(el.dataset.idx))} UTC`,
       status: el.dataset.status as StatusCode,
     });
     const track = trackRef.current;
@@ -307,7 +333,7 @@ export default function Timeline({
   const hourWindowLabel =
     deferredHour === "all"
       ? null
-      : `${deferredHour.padStart(2, "0")}:00\u2013${deferredHour.padStart(2, "0")}:59`;
+      : `${deferredHour.padStart(2, "0")}:00\u2013${deferredHour.padStart(2, "0")}:59 UTC`;
 
   return (
     <section id="timeline" className="anim-fade-up mx-auto w-full max-w-6xl scroll-mt-20 px-4 pt-10">
