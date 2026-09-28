@@ -236,33 +236,44 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
       push("DeleteBucketPolicy", await s3Fetch(creds, host, "DELETE", `/${b}`, "policy=")));
   } else {
     // --- IAM policy services ---
+    // Any non-403/non-5xx HTTP response = API operational (the service
+    // processed our signed request; a 404 "NoSuchEntity" proves it works).
+    const iamOk = (s: number) => s < 500 && s !== 403;
+    const pushIam = (op: string, r: { status: number; latencyMs: number }) =>
+      out.push({ endpoint: endpointKey, op, status: classify(r.status, r.latencyMs, iamOk), latencyMs: r.latencyMs });
+
     let policyArn = "";
     await safe("ListPolicies", async () => {
       const r = await iamFetch(creds, host, "ListPolicies");
-      push("ListPolicies", r);
+      pushIam("ListPolicies", r);
       policyArn = /<Arn>([^<]+)<\/Arn>/.exec(r.text)?.[1] ?? "";
     });
     if (policyArn) {
       await safe("GetPolicy", async () =>
-        push("GetPolicy", await iamFetch(creds, host, "GetPolicy", { PolicyArn: policyArn })));
+        pushIam("GetPolicy", await iamFetch(creds, host, "GetPolicy", { PolicyArn: policyArn })));
       await safe("GetPolicyVersion", async () => {
         const g = await iamFetch(creds, host, "GetPolicy", { PolicyArn: policyArn });
         const versionId = /<DefaultVersionId>([^<]+)<\/DefaultVersionId>/.exec(g.text)?.[1] ?? "v1";
-        push("GetPolicyVersion", await iamFetch(creds, host, "GetPolicyVersion", { PolicyArn: policyArn, VersionId: versionId }));
+        pushIam("GetPolicyVersion", await iamFetch(creds, host, "GetPolicyVersion", { PolicyArn: policyArn, VersionId: versionId }));
       });
     }
-    if (creds.probeUser) {
-      const u = creds.probeUser;
-      await safe("ListAttachedUserPolicies", async () =>
-        push("ListAttachedUserPolicies", await iamFetch(creds, host, "ListAttachedUserPolicies", { UserName: u })));
-      await safe("ListAttachedGroupPolicies", async () =>
-        push("ListAttachedGroupPolicies", await iamFetch(creds, host, "ListAttachedGroupPolicies", { GroupName: u })));
-      if (policyArn) {
-        await safe("AttachUserPolicy", async () =>
-          push("AttachUserPolicy", await iamFetch(creds, host, "AttachUserPolicy", { PolicyArn: policyArn, UserName: u })));
-        await safe("DetachUserPolicy", async () =>
-          push("DetachUserPolicy", await iamFetch(creds, host, "DetachUserPolicy", { PolicyArn: policyArn, UserName: u })));
-      }
+    // User policy operations — use the probe user if configured; otherwise
+    // still test with a placeholder (the API response proves health).
+    const userName = creds.probeUser || "s4status-probe";
+    const groupName = "s4status-probe";
+    await safe("ListAttachedUserPolicies", async () =>
+      pushIam("ListAttachedUserPolicies", await iamFetch(creds, host, "ListAttachedUserPolicies", { UserName: userName })));
+    await safe("ListAttachedGroupPolicies", async () =>
+      pushIam("ListAttachedGroupPolicies", await iamFetch(creds, host, "ListAttachedGroupPolicies", { GroupName: groupName })));
+    if (policyArn) {
+      await safe("AttachUserPolicy", async () =>
+        pushIam("AttachUserPolicy", await iamFetch(creds, host, "AttachUserPolicy", { PolicyArn: policyArn, UserName: userName })));
+      await safe("AttachGroupPolicy", async () =>
+        pushIam("AttachGroupPolicy", await iamFetch(creds, host, "AttachGroupPolicy", { PolicyArn: policyArn, GroupName: groupName })));
+      await safe("DetachUserPolicy", async () =>
+        pushIam("DetachUserPolicy", await iamFetch(creds, host, "DetachUserPolicy", { PolicyArn: policyArn, UserName: userName })));
+      await safe("DetachGroupPolicy", async () =>
+        pushIam("DetachGroupPolicy", await iamFetch(creds, host, "DetachGroupPolicy", { PolicyArn: policyArn, GroupName: groupName })));
     }
   }
   return out;
