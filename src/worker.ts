@@ -69,34 +69,58 @@ const badRequest = (msg: string) => json({ error: msg }, 400);
 const ST_RANK = { operational: 0, degraded: 1, outage: 2 } as const;
 const WORST_SQL = `CASE status WHEN 'operational' THEN 0 WHEN 'degraded' THEN 1 ELSE 2 END`;
 
-interface SlotRow {
-  endpoint: string;
-  op: string;
-  status: string;
-}
-
-/** Rows of the most recent slot that has data (within the last 20 minutes). */
-async function latestSlotRows(env: Env, now: Date): Promise<SlotRow[]> {
+/**
+ * Latest check result per endpoint — each endpoint's own most recent slot
+ * within the rotation window (not a single shared slot, since the rotation
+ * checks different endpoints at different minutes).
+ */
+async function latestDataPerEndpoint(
+  env: Env,
+  now: Date,
+): Promise<Map<string, { op: string; status: string }[]>> {
   await ensureStatusSchema(env);
-  for (let i = 0; i < 16; i++) {
-    const s = slotKey(new Date(now.getTime() - i * 5 * 60_000));
-    const r = await env.DB.prepare("SELECT endpoint, op, status FROM status_slots WHERE slot = ?")
-      .bind(s)
-      .all<SlotRow>();
-    if (r.results.length > 0) return r.results;
+  const since = slotKey(new Date(now.getTime() - 20 * 60_000));
+  const { results } = await env.DB.prepare(
+    "SELECT endpoint, op, status, slot FROM status_slots WHERE slot >= ? ORDER BY slot DESC",
+  )
+    .bind(since)
+    .all<{ endpoint: string; op: string; status: string; slot: string }>();
+
+  // Each endpoint's ops share the same slot (checked as one chain), so the
+  // first slot seen per endpoint in DESC order is that endpoint's latest.
+  const latestSlot = new Map<string, string>();
+  for (const row of results) {
+    if (!latestSlot.has(row.endpoint)) latestSlot.set(row.endpoint, row.slot);
   }
-  return [];
+
+  const map = new Map<string, { op: string; status: string }[]>();
+  for (const row of results) {
+    if (latestSlot.get(row.endpoint) !== row.slot) continue;
+    let list = map.get(row.endpoint);
+    if (!list) {
+      list = [];
+      map.set(row.endpoint, list);
+    }
+    list.push({ op: row.op, status: row.status });
+  }
+  return map;
 }
 
-/** Worst status per endpoint for the latest measured slot. */
-async function currentStatusByEndpoint(env: Env, now: Date): Promise<Map<string, string>> {
-  const rows = await latestSlotRows(env, now);
+/** Worst status per endpoint from each endpoint's own latest check. */
+async function currentStatusByEndpoint(
+  env: Env,
+  now: Date,
+): Promise<Map<string, string>> {
+  const perEp = await latestDataPerEndpoint(env, now);
   const map = new Map<string, string>();
-  for (const r of rows) {
-    const cur = map.get(r.endpoint);
-    if (!cur || ST_RANK[r.status as keyof typeof ST_RANK] > ST_RANK[cur as keyof typeof ST_RANK]) {
-      map.set(r.endpoint, r.status);
+  for (const [ep, ops] of perEp) {
+    let worst: string = "operational";
+    for (const { status } of ops) {
+      if (ST_RANK[status as keyof typeof ST_RANK] > ST_RANK[worst as keyof typeof ST_RANK]) {
+        worst = status;
+      }
     }
+    map.set(ep, worst);
   }
   return map;
 }
@@ -137,8 +161,17 @@ async function endpointList(env: Env, now: Date) {
 }
 
 async function handleOverview(env: Env, now: Date): Promise<Response> {
-  const rows = await latestSlotRows(env, now);
-  const statusMap = await currentStatusByEndpoint(env, now);
+  const perEpData = await latestDataPerEndpoint(env, now);
+  const statusMap = new Map<string, string>();
+  for (const [ep, ops] of perEpData) {
+    let worst: string = "operational";
+    for (const { status } of ops) {
+      if (ST_RANK[status as keyof typeof ST_RANK] > ST_RANK[worst as keyof typeof ST_RANK]) {
+        worst = status;
+      }
+    }
+    statusMap.set(ep, worst);
+  }
   const upMap = await uptimeByEndpointToday(env, now);
   const endpoints = ENDPOINTS.map((ep) => {
     const region = REGIONS.find((r) => r.id === ep.regionId)!;
@@ -179,9 +212,15 @@ async function handleOverview(env: Env, now: Date): Promise<Response> {
     }
     incidentMinutes = Math.max(incidentMinutes, run * 5);
   }
-  const affectedOperations = new Set(
-    rows.filter((r) => r.status !== "operational").map((r) => r.op),
-  ).size;
+  const affectedOperations = (() => {
+    const failing = new Set<string>();
+    for (const [, ops] of perEpData) {
+      for (const { op, status } of ops) {
+        if (status !== "operational") failing.add(op);
+      }
+    }
+    return failing.size;
+  })();
 
   return json({
     generatedAt: now.toISOString(),
