@@ -38,6 +38,8 @@ interface Creds {
   probeUser: string | null;
 }
 
+const diagSamples: string[] = [];
+
 /** A response counts as "service healthy" unless it is an auth or server error. */
 function classify(status: number, latencyMs: number, okStatuses = (s: number) => s < 400): CheckResult["status"] {
   const networkOk = status > 0 && status < 500 && status !== 403;
@@ -99,12 +101,18 @@ async function iamFetch(
 async function checkEndpoint(endpointKey: string, host: string, creds: Creds): Promise<CheckResult[]> {
   const out: CheckResult[] = [];
   const b = creds.bucket;
-  const push = (op: string, r: { status: number; latencyMs: number }, okStatuses?: (s: number) => boolean) =>
-    out.push({ endpoint: endpointKey, op, status: classify(r.status, r.latencyMs, okStatuses), latencyMs: r.latencyMs });
+  const push = (op: string, r: { status: number; latencyMs: number; text?: string }, okStatuses?: (s: number) => boolean) => {
+    const status = classify(r.status, r.latencyMs, okStatuses);
+    if (status === "outage" && diagSamples.length < 6) {
+      diagSamples.push(`${endpointKey} ${op} -> HTTP ${r.status}: ${(r.text ?? "").slice(0, 180)}`);
+    }
+    out.push({ endpoint: endpointKey, op, status, latencyMs: r.latencyMs });
+  };
   const safe = async (op: string, fn: () => Promise<unknown>) => {
     try {
       await fn();
-    } catch {
+    } catch (e) {
+      if (diagSamples.length < 6) diagSamples.push(`${endpointKey} ${op} THREW: ${String(e).slice(0, 180)}`);
       out.push({ endpoint: endpointKey, op, status: "outage", latencyMs: 0 });
     }
   };
@@ -208,13 +216,11 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
     if (policyArn) {
       await safe("GetPolicy", async () =>
         push("GetPolicy", await iamFetch(creds, host, "GetPolicy", { PolicyArn: policyArn })));
-      const versionId = /<DefaultVersionId>([^<]+)<\/DefaultVersionId>/.exec(
-        (await iamFetch(creds, host, "GetPolicy", { PolicyArn: policyArn })).text,
-      )?.[1];
-      if (versionId) {
-        await safe("GetPolicyVersion", async () =>
-          push("GetPolicyVersion", await iamFetch(creds, host, "GetPolicyVersion", { PolicyArn: policyArn, VersionId: versionId })));
-      }
+      await safe("GetPolicyVersion", async () => {
+        const g = await iamFetch(creds, host, "GetPolicy", { PolicyArn: policyArn });
+        const versionId = /<DefaultVersionId>([^<]+)<\/DefaultVersionId>/.exec(g.text)?.[1] ?? "v1";
+        push("GetPolicyVersion", await iamFetch(creds, host, "GetPolicyVersion", { PolicyArn: policyArn, VersionId: versionId }));
+      });
     }
     if (creds.probeUser) {
       const u = creds.probeUser;
@@ -268,6 +274,7 @@ export async function runChecks(env: Env): Promise<void> {
     probeUser: env.S4_IAM_PROBE_USER || null,
   };
 
+  diagSamples.length = 0;
   const firstS3Host = ENDPOINTS.find((e) => e.service === "s3")!.url;
   const chains = ENDPOINTS.map((ep) => checkEndpoint(ep.key, ep.url, creds));
   chains.push(checkCanary(creds, firstS3Host));
@@ -301,10 +308,8 @@ export async function runChecks(env: Env): Promise<void> {
     acc[r.status] = (acc[r.status] ?? 0) + 1;
     return acc;
   }, {});
-  console.log(
-    `[checker] ${slot}: ${results.length} rows —`,
-    JSON.stringify(counts),
-  );
+  console.log(`[checker] ${slot}: ${results.length} rows —`, JSON.stringify(counts));
+  for (const s of diagSamples) console.log(`[checker][diag] ${s}`);
 }
 
 /** Zero-padded UTC slot key, e.g. "2026-09-28 05:05" (slot start). */
