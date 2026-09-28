@@ -238,9 +238,18 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
     // --- IAM policy services ---
     // Any non-403/non-5xx HTTP response = API operational (the service
     // processed our signed request; a 404 "NoSuchEntity" proves it works).
-    const iamOk = (s: number) => s < 500 && s !== 403;
+    // The IAM service is "operational" when it processes our signed request
+    // and answers with a protocol-level response — including NoSuchEntity
+    // (target user/policy doesn't exist) and EntityAlreadyExists. Those are
+    // 403/404 with distinct error codes. Only AccessDenied-on-policy (the
+    // checker's credentials lack the action), throttling, or 5xx mean trouble.
+    const iamOkText = (s: number, text: string) => {
+      if (s < 500 && s !== 403) return true;
+      const code = /<Code>([^<]+)<\/Code>/.exec(text)?.[1] ?? "";
+      return /NoSuch/i.test(code) || /Already/i.test(code);
+    };
     const pushIam = (op: string, r: { status: number; latencyMs: number; text?: string }) => {
-      const status = classify(r.status, r.latencyMs, iamOk);
+      const status = r.status === 429 ? "degraded" : iamOkText(r.status, r.text ?? "") ? classify(r.status, r.latencyMs, () => true) : "outage";
       if (status === "outage" && diagSamples.length < 6) {
         diagSamples.push(`${endpointKey} ${op} -> HTTP ${r.status}: ${(r.text ?? "").slice(0, 160)}`);
       }
