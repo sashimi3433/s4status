@@ -55,11 +55,8 @@
     opacity: 0;
   }
 }
-/* Bars fade in one by one. background-color (NOT opacity) — opacity
-   animations are composited on the GPU, and destroying the compositor
-   layer when the animation ends causes a visible color "snap" as the
-   element reverts to main-thread rendering. background-color animations
-   run entirely on the main thread with no layer handoff. */
+/* Bars fade in one by one. background-color + fill:both to pin the final
+   state and prevent any style recalculation when the animation ends. */
 @keyframes slot-fade {
   from {
     background-color: transparent;
@@ -101,12 +98,9 @@
    overlay visibly brightens bars as it passes, causing a color "snap" when
    the sheen finishes and bars revert to their true colors. */
 .anim-slot-fade {
-  animation: slot-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: slot-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Hold the timeline cascade until it scrolls into view; Timeline.tsx removes
-   this class via IntersectionObserver. Paused also freezes the delay phase,
-   so bars stay invisible and the stagger starts on release. */
 .anim-hold .anim-slot-fade {
   animation-play-state: paused;
 }
