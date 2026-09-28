@@ -61,7 +61,7 @@ const EN: SpecStrings = {
     "- **Rate limit: 100 requests / minute / IP** across all `/api/*` endpoints. " +
     "Responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining` and " +
     "`X-RateLimit-Reset` headers; exceeding the limit returns `429` with `Retry-After`.\n" +
-    "- Statuses are recorded in **5-minute slots**; history covers **7 days** including today.\n" +
+    "- Every endpoint is checked **at least every 15 minutes**; statuses are recorded in **5-minute slots**; history covers **7 days** including today.\n" +
     "- `status` enum: `operational` / `degraded` / `outage` / `nodata`.",
   tagStatus: "Current status",
   tagTimeline: "Per-operation slot history",
@@ -141,7 +141,7 @@ const JA: SpecStrings = {
     "- **レートリミット: 100リクエスト / 分 / IP**(`/api/*` 全体で共通)。 " +
     "応答には `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` ヘッダーが付き、" +
     "制限超過時は `Retry-After` 付きの `429` を返します。\n" +
-    "- ステータスは**5分スロット**で記録され、履歴は当日を含む**7日分**です。\n" +
+    "- 各エンドポイントは**最短約15分間隔**でチェックされます。ステータスは**5分スロット**で記録され、履歴は当日を含む**7日分**です。\n" +
     "- `status` 列挙値: `operational`(正常)/ `degraded`(低下)/ `outage`(障害)/ `nodata`(データなし)。",
   tagStatus: "現在のステータス",
   tagTimeline: "操作別スロット履歴",

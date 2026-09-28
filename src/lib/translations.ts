@@ -51,7 +51,7 @@ const ja = {
   "group.policies": "ポリシー・ACL",
   "group.iam-policies": "ポリシー",
   "timeline.title": "操作別 稼働タイムライン",
-  "timeline.subtitle": "各API操作のステータスを5分ごとに記録しています",
+  "timeline.subtitle": "各API操作のステータスを約15分間隔で記録しています",
   "timeline.endpoint": "エンドポイント",
   "timeline.allEndpoints": "すべてのエンドポイント(全体)",
   "timeline.date": "日付",
@@ -127,7 +127,7 @@ const en = {
   "group.policies": "Policies & ACL",
   "group.iam-policies": "Policies",
   "timeline.title": "Uptime by operation",
-  "timeline.subtitle": "Every API operation is checked every 5 minutes",
+  "timeline.subtitle": "Every API operation is checked at least every 15 minutes",
   "timeline.endpoint": "Endpoint",
   "timeline.allEndpoints": "All endpoints (aggregate)",
   "timeline.date": "Date",
@@ -203,7 +203,7 @@ const zh = {
   "group.policies": "策略与 ACL",
   "group.iam-policies": "策略",
   "timeline.title": "按操作划分的可用性时间线",
-  "timeline.subtitle": "每 5 分钟记录一次各 API 操作的状态",
+  "timeline.subtitle": "以最长约 15 分钟的间隔记录各 API 操作的状态",
   "timeline.endpoint": "端点",
   "timeline.allEndpoints": "所有端点(汇总)",
   "timeline.date": "日期",
@@ -279,7 +279,7 @@ const ko = {
   "group.policies": "정책 및 ACL",
   "group.iam-policies": "정책",
   "timeline.title": "작업별 가동 타임라인",
-  "timeline.subtitle": "모든 API 작업의 상태를 5분마다 기록합니다",
+  "timeline.subtitle": "모든 API 작업의 상태를 최대 약 15분 간격으로 기록합니다",
   "timeline.endpoint": "엔드포인트",
   "timeline.allEndpoints": "전체 엔드포인트(통합)",
   "timeline.date": "날짜",
@@ -355,7 +355,7 @@ const es = {
   "group.policies": "Políticas y ACL",
   "group.iam-policies": "Políticas",
   "timeline.title": "Disponibilidad por operación",
-  "timeline.subtitle": "Cada operación de la API se comprueba cada 5 minutos",
+  "timeline.subtitle": "Cada operación de la API se comprueba al menos cada 15 minutos",
   "timeline.endpoint": "Endpoint",
   "timeline.allEndpoints": "Todos los endpoints (agregado)",
   "timeline.date": "Fecha",
@@ -431,7 +431,7 @@ const fr = {
   "group.policies": "Politiques et ACL",
   "group.iam-policies": "Politiques",
   "timeline.title": "Disponibilité par opération",
-  "timeline.subtitle": "Chaque opération d'API est vérifiée toutes les 5 minutes",
+  "timeline.subtitle": "Chaque opération d'API est vérifiée au moins toutes les 15 minutes",
   "timeline.endpoint": "Endpoint",
   "timeline.allEndpoints": "Tous les endpoints (agrégé)",
   "timeline.date": "Date",
@@ -507,7 +507,7 @@ const de = {
   "group.policies": "Richtlinien & ACL",
   "group.iam-policies": "Richtlinien",
   "timeline.title": "Verfügbarkeit je Vorgang",
-  "timeline.subtitle": "Jeder API-Vorgang wird alle 5 Minuten geprüft",
+  "timeline.subtitle": "Jeder API-Vorgang wird spätestens alle 15 Minuten geprüft",
   "timeline.endpoint": "Endpoint",
   "timeline.allEndpoints": "Alle Endpoints (aggregiert)",
   "timeline.date": "Datum",
@@ -583,7 +583,7 @@ const nl = {
   "group.policies": "Beleid & ACL",
   "group.iam-policies": "Beleid",
   "timeline.title": "Beschikbaarheid per bewerking",
-  "timeline.subtitle": "Elke API-bewerking wordt elke 5 minuten gecontroleerd",
+  "timeline.subtitle": "Elke API-bewerking wordt minstens elke 15 minuten gecontroleerd",
   "timeline.endpoint": "Endpoint",
   "timeline.allEndpoints": "Alle endpoints (geaggregeerd)",
   "timeline.date": "Datum",
@@ -636,7 +636,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "どのようにステータスを確認していますか?",
-      a: "各リージョンのエンドポイント(s3.<region>.megas4.com / iam.<region>.megas4.com)に対して、対応しているすべてのAPI操作を5分おきに実際に実行し、その成否とレイテンシからステータスを判定します。",
+      a: "各リージョンのエンドポイント(s3.<region>.megas4.com / iam.<region>.megas4.com)に対して、対応しているすべてのAPI操作を約15分間隔で実際に実行し、その成否とレイテンシからステータスを判定します。",
     },
     {
       q: "どの操作が監視対象ですか?",
@@ -666,7 +666,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "How do you check the status?",
-      a: "Every 5 minutes, each supported API operation is executed against each regional endpoint (s3.<region>.megas4.com / iam.<region>.megas4.com) and the status is derived from success rate and latency.",
+      a: "At least every 15 minutes, each supported API operation is executed against each regional endpoint (s3.<region>.megas4.com / iam.<region>.megas4.com) and the status is derived from success rate and latency.",
     },
     {
       q: "Which operations are monitored?",
@@ -696,7 +696,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "如何检测状态?",
-      a: "每 5 分钟对各区域端点(s3.<region>.megas4.com / iam.<region>.megas4.com)实际执行所有受支持的 API 操作,并根据成功率和延迟判断状态。",
+      a: "以最长约 15 分钟的间隔对各区域端点(s3.<region>.megas4.com / iam.<region>.megas4.com)实际执行所有受支持的 API 操作,并根据成功率和延迟判断状态。",
     },
     {
       q: "监控哪些操作?",
@@ -726,7 +726,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "상태는 어떻게 확인하나요?",
-      a: "5분마다 각 리전 엔드포인트(s3.<region>.megas4.com / iam.<region>.megas4.com)에 대해 지원되는 모든 API 작업을 실제로 실행하고, 성공률과 지연 시간으로 상태를 판정합니다. ",
+      a: "최대 약 15분 간격으로 각 리전 엔드포인트(s3.<region>.megas4.com / iam.<region>.megas4.com)에 대해 지원되는 모든 API 작업을 실제로 실행하고, 성공률과 지연 시간으로 상태를 판정합니다. ",
     },
     {
       q: "어떤 작업을 모니터링하나요?",
@@ -756,7 +756,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "¿Cómo se comprueba el estado?",
-      a: "Cada 5 minutos se ejecuta cada operación de API admitida contra cada endpoint regional (s3.<region>.megas4.com / iam.<region>.megas4.com) y el estado se deduce de la tasa de éxito y la latencia.",
+      a: "Como máximo cada 15 minutos se ejecuta cada operación de API admitida contra cada endpoint regional (s3.<region>.megas4.com / iam.<region>.megas4.com) y el estado se deduce de la tasa de éxito y la latencia.",
     },
     {
       q: "¿Qué operaciones se monitorizan?",
@@ -786,7 +786,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "Comment l'état est-il vérifié ?",
-      a: "Toutes les 5 minutes, chaque opération d'API prise en charge est exécutée sur chaque endpoint régional (s3.<region>.megas4.com / iam.<region>.megas4.com) et l'état est déduit du taux de réussite et de la latence.",
+      a: "Au maximum toutes les 15 minutes, chaque opération d'API prise en charge est exécutée sur chaque endpoint régional (s3.<region>.megas4.com / iam.<region>.megas4.com) et l'état est déduit du taux de réussite et de la latence.",
     },
     {
       q: "Quelles opérations sont surveillées ?",
@@ -816,7 +816,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "Wie wird der Status geprüft?",
-      a: "Alle 5 Minuten wird jeder unterstützte API-Vorgang gegen jeden regionalen Endpoint (s3.<region>.megas4.com / iam.<region>.megas4.com) ausgeführt; der Status ergibt sich aus Erfolgsquote und Latenz.",
+      a: "Spätestens alle 15 Minuten wird jeder unterstützte API-Vorgang gegen jeden regionalen Endpoint (s3.<region>.megas4.com / iam.<region>.megas4.com) ausgeführt; der Status ergibt sich aus Erfolgsquote und Latenz.",
     },
     {
       q: "Welche Vorgänge werden überwacht?",
@@ -846,7 +846,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "Hoe wordt de status gecontroleerd?",
-      a: "Elke 5 minuten wordt elke ondersteunde API-bewerking uitgevoerd tegen elk regionaal endpoint (s3.<region>.megas4.com / iam.<region>.megas4.com); de status volgt uit het slagingspercentage en de latentie.",
+      a: "Uiterlijk elke 15 minuten wordt elke ondersteunde API-bewerking uitgevoerd tegen elk regionaal endpoint (s3.<region>.megas4.com / iam.<region>.megas4.com); de status volgt uit het slagingspercentage en de latentie.",
     },
     {
       q: "Welke bewerkingen worden gemonitord?",
