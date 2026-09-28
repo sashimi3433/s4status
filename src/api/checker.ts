@@ -30,6 +30,27 @@ const MP_KEY2 = "s4status-mp-copy.txt";
 const CANARY_BUCKET = "s4status-canary";
 const DEGRADED_MS = 4000;
 
+/** CRC32 + base64 for x-amz-checksum-crc32 (Workers has no MD5). */
+const CRC_TABLE = (() => {
+  const t: number[] = [];
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32Base64(text: string): string {
+  let crc = 0xffffffff;
+  const bytes = new TextEncoder().encode(text);
+  for (let i = 0; i < bytes.length; i++) {
+    crc = CRC_TABLE[(crc ^ bytes[i]!) & 0xff]! ^ (crc >>> 8);
+  }
+  const value = (crc ^ 0xffffffff) >>> 0;
+  return btoa(String.fromCharCode(...new Uint8Array(new Uint32Array([value]).buffer)));
+}
+
 interface Creds {
   accessKeyId: string;
   secretAccessKey: string;
@@ -147,7 +168,12 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
       ));
     await safe("DeleteObjects", async () => {
       const delBody = `<Delete><Object><Key>${PROBE_KEY2}</Key></Object></Delete>`;
-      push("DeleteObjects", await s3Fetch(creds, host, "POST", `/${b}`, "delete=", {}, delBody));
+      push(
+        "DeleteObjects",
+        await s3Fetch(creds, host, "POST", `/${b}`, "delete=", {
+          "x-amz-checksum-crc32": crc32Base64(delBody),
+        }, delBody),
+      );
     });
     await safe("DeleteObject", async () =>
       push("DeleteObject", await s3Fetch(creds, host, "DELETE", `/${b}/${PROBE_KEY}`, "")));
@@ -158,8 +184,7 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
     await safe("CreateMultipartUpload", async () => {
       const r = await s3Fetch(creds, host, "POST", `/${b}/${MP_KEY}`, "uploads=");
       push("CreateMultipartUpload", r);
-      uploadId = new DOMParser().parseFromString(r.text, "text/xml")
-        .getElementsByTagName("UploadId")[0]?.textContent ?? "";
+      uploadId = /<UploadId>([^<]+)<\/UploadId>/.exec(r.text)?.[1] ?? "";
     });
     if (uploadId) {
       await safe("UploadPart", async () =>
@@ -171,8 +196,7 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
         push("ListParts", await s3Fetch(creds, host, "GET", `/${b}/${MP_KEY}`, `uploadId=${encodeURIComponent(uploadId)}`)));
       await safe("UploadPartCopy", async () => {
         const create = await s3Fetch(creds, host, "POST", `/${b}/${MP_KEY2}`, "uploads=");
-        copyUploadId = new DOMParser().parseFromString(create.text, "text/xml")
-          .getElementsByTagName("UploadId")[0]?.textContent ?? "";
+        copyUploadId = /<UploadId>([^<]+)<\/UploadId>/.exec(create.text)?.[1] ?? "";
         if (!copyUploadId) throw new Error("no uploadId");
         const r = await s3Fetch(creds, host, "PUT", `/${b}/${MP_KEY2}`, `partNumber=1&uploadId=${encodeURIComponent(copyUploadId)}`, {
           "x-amz-copy-source": `/${b}/${PROBE_KEY}`,
