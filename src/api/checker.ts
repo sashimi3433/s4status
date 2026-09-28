@@ -275,14 +275,38 @@ export async function runChecks(env: Env): Promise<void> {
   };
 
   diagSamples.length = 0;
-  const firstS3Host = ENDPOINTS.find((e) => e.service === "s3")!.url;
-  const chains = ENDPOINTS.map((ep) => checkEndpoint(ep.key, ep.url, creds));
-  chains.push(checkCanary(creds, firstS3Host));
-  const settled = await Promise.allSettled(chains);
+  // Free plan caps a Worker invocation at 50 subrequests, so each run checks
+  // a rotating slice of endpoints (2 per minute → full 28-endpoint cycle in
+  // ~14 minutes) instead of the whole matrix at once.
+  const TAKE = 2;
+  const cursorRow = await env.DB.prepare("SELECT value FROM meta WHERE key = 'cursor'")
+    .first<{ value: string }>();
+  const cursor = Number(cursorRow?.value ?? 0) % ENDPOINTS.length;
+  const slice: typeof ENDPOINTS = [];
+  for (let i = 0; i < TAKE; i++) slice.push(ENDPOINTS[(cursor + i) % ENDPOINTS.length]!);
+  const includeCanary = cursor === 0; // once per full cycle
 
-  const results: CheckResult[] = settled.flatMap((s) =>
-    s.status === "fulfilled" ? s.value : [],
-  );
+  const results: CheckResult[] = [];
+  for (const ep of slice) {
+    try {
+      results.push(...(await checkEndpoint(ep.key, ep.url, creds)));
+    } catch (e) {
+      if (diagSamples.length < 6) diagSamples.push(`${ep.key} CHAIN THREW: ${String(e).slice(0, 180)}`);
+    }
+  }
+  if (includeCanary) {
+    try {
+      results.push(...(await checkCanary(creds, ENDPOINTS.find((e) => e.service === "s3")!.url)));
+    } catch {
+      /* diag already covers */
+    }
+  }
+  const nextCursor = (cursor + TAKE) % ENDPOINTS.length;
+  await env.DB.prepare(
+    "INSERT OR REPLACE INTO meta (key, value) VALUES ('cursor', ?1)",
+  )
+    .bind(String(nextCursor))
+    .run();
   // Fill any missing op/endpoint cells as nodata-free (skip) — absent = nodata on read.
 
   const now = new Date();
@@ -332,5 +356,8 @@ export async function ensureStatusSchema(env: Env): Promise<void> {
   ).run();
   await env.DB.prepare(
     "CREATE INDEX IF NOT EXISTS idx_status_slots_slot ON status_slots (slot)",
+  ).run();
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
   ).run();
 }
