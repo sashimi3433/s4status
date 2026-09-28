@@ -128,7 +128,7 @@ async function currentStatusByEndpoint(
 async function uptimeByEndpointToday(db: Db, now: Date): Promise<Map<string, number | null>> {
   const start = slotKey(new Date(now.getTime() - 24 * 3600_000)); // trailing 24h
   const r = await db.query<{ endpoint: string; total: number; ok: number | null }>(
-    "SELECT endpoint, COUNT(*) AS total, SUM(status = 'operational') AS ok FROM status_slots WHERE slot >= $1 GROUP BY endpoint",
+    "SELECT endpoint, COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'operational') AS ok FROM status_slots WHERE slot >= $1 GROUP BY endpoint",
     [start],
   );
   return new Map(
