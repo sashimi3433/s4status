@@ -55,13 +55,14 @@
     opacity: 0;
   }
 }
-/* Bars fade in one by one (day view: 2ms stagger, hour view: 35ms).
-   Opacity only: scaling bars on the compositor renders them slightly soft,
-   and de-promoting the layer when the animation ends visibly "sharpens"
-   everything at once. Keeping geometry fixed avoids that rasterization snap. */
+/* Bars fade in one by one. background-color (NOT opacity) — opacity
+   animations are composited on the GPU, and destroying the compositor
+   layer when the animation ends causes a visible color "snap" as the
+   element reverts to main-thread rendering. background-color animations
+   run entirely on the main thread with no layer handoff. */
 @keyframes slot-fade {
   from {
-    opacity: 0;
+    background-color: transparent;
   }
 }
 @keyframes pop-in {
