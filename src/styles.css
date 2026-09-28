@@ -100,6 +100,10 @@
 .anim-slot-fade {
   animation: slot-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+/* Data refreshes: bars render at full color with no animation at all. */
+.no-anim {
+  animation: none !important;
+}
 
 .anim-hold .anim-slot-fade {
   animation-play-state: paused;

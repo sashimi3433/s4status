@@ -98,11 +98,13 @@ function OpRow({
   statuses,
   uptime,
   revealDelay,
+  animate,
 }: {
   op: Operation;
   statuses: StatusCode[]; // bucketed (48 entries)
   uptime: number | null; // slot-accurate, computed pre-bucketing
   revealDelay: number;
+  animate: boolean;
 }) {
   const up = uptime;
   const worstStatus = statuses.reduce<StatusCode>(
@@ -129,15 +131,17 @@ function OpRow({
           after the cascade. Opacity-only: scaling bars on the compositor
           renders them slightly soft and de-promoting the layer at animation
           end visibly "sharpens" them. */}
-      <div className="flex h-7 cursor-crosshair gap-px overflow-hidden rounded-[3px]">
+      <div
+        className={`flex h-7 cursor-crosshair gap-px overflow-hidden rounded-[3px]${animate ? "" : " no-anim"}`}
+      >
         {statuses.map((s, i) => (
           <div
             key={i}
             data-op={op.id}
             data-idx={i}
             data-status={s}
-            className={`anim-slot-fade h-full min-w-0 flex-1 hover:brightness-125 ${STATUS_BG[s]}`}
-            style={{ animationDelay: `${revealDelay + i * 2}ms` }}
+            className={`${animate ? "anim-slot-fade" : "no-anim"} h-full min-w-0 flex-1 hover:brightness-125 ${STATUS_BG[s]}`}
+            style={animate ? { animationDelay: `${revealDelay + i * 2}ms` } : undefined}
           />
         ))}
       </div>
@@ -171,6 +175,15 @@ export default function Timeline({
 
   // Live day data from the public API (worker + D1, filled by the 5-min cron).
   const [dayCodes, setDayCodes] = useState<Map<string, Uint8Array> | null>(null);
+
+  // Animate only the FIRST render of each endpoint/date view; the 60s data
+  // refreshes update bars in place without replaying the cascade.
+  const animatedViewRef = useRef<string>("");
+  const viewKey = `${deferredEndpoint}|${deferredDate}`;
+  const animateThisView = animatedViewRef.current !== viewKey;
+  useEffect(() => {
+    if (dayCodes && animateThisView) animatedViewRef.current = viewKey;
+  }, [dayCodes, animateThisView, viewKey]);
   useEffect(() => {
     let cancelled = false;
     setDayCodes(null);
@@ -488,7 +501,8 @@ export default function Timeline({
                           statuses={row.statuses}
                           uptime={row.uptime}
                           revealDelay={220 + (rowOffsets[si]! + ri) * 22}
-                                                  />
+                          animate={animateThisView}
+                        />
                       ))}
                     </div>
                   </div>
