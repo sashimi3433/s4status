@@ -357,7 +357,12 @@ export async function runChecks(env: Env, db: Db): Promise<void> {
     includeCanary = s3Cursor === 0;
     await db.query(
       "INSERT INTO meta (key, value) VALUES ($1, $2), ($3, $4) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-      [String((s3Cursor + 1) % s3List.length), String((iamCursor + 2) % iamList.length)],
+      [
+        "s3cursor",
+        String((s3Cursor + 1) % s3List.length),
+        "iamcursor",
+        String((iamCursor + 2) % iamList.length),
+      ],
     );
   }
 
