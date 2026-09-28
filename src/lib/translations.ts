@@ -632,7 +632,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "過去のデータはどこまでさかのぼれますか?",
-      a: "5分粒度で過去7日分(当日を含む)です。日付ピッカーで日付を選択して確認できます。",
+      a: "15分粒度で過去7日分(当日を含む)です。日付ピッカーで日付を選択して確認できます。",
     },
     {
       q: "通知メールには何が届きますか?",
@@ -662,7 +662,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "How far back does the history go?",
-      a: "7 days including today, at 5-minute granularity. Use the date picker to inspect a specific day.",
+      a: "7 days including today, at 15-minute granularity. Use the date picker to inspect a specific day.",
     },
     {
       q: "What will the notification emails contain?",
@@ -692,7 +692,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "历史数据可以回溯多久?",
-      a: "含当天在内共 7 天,粒度为 5 分钟。可使用日期选择器查看指定日期。",
+      a: "含当天在内共 7 天,粒度为 15 分钟。可使用日期选择器查看指定日期。",
     },
     {
       q: "通知邮件包含什么内容?",
@@ -722,7 +722,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "과거 데이터는 얼마나 조회할 수 있나요?",
-      a: "당일 포함 7일간, 5분 단위입니다. 날짜 선택기로 원하는 날짜를 확인할 수 있습니다.",
+      a: "당일 포함 7일간, 15분 단위입니다. 날짜 선택기로 원하는 날짜를 확인할 수 있습니다.",
     },
     {
       q: "알림 이메일에는 무엇이 오나요?",
@@ -752,7 +752,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "¿Hasta dónde llega el historial?",
-      a: "7 días incluido el de hoy, con una granularidad de 5 minutos. Usa el selector de fechas para inspeccionar un día concreto.",
+      a: "7 días incluido el de hoy, con una granularidad de 15 minutos. Usa el selector de fechas para inspeccionar un día concreto.",
     },
     {
       q: "¿Qué contendrán los correos de notificación?",
@@ -782,7 +782,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "Sur quelle profondeur l'historique remonte-t-il ?",
-      a: "7 jours en incluant aujourd'hui, avec une granularité de 5 minutes. Utilisez le sélecteur de date pour examiner un jour précis.",
+      a: "7 jours en incluant aujourd'hui, avec une granularité de 15 minutes. Utilisez le sélecteur de date pour examiner un jour précis.",
     },
     {
       q: "Que contiendront les e-mails de notification ?",
@@ -812,7 +812,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "Wie weit reicht der Verlauf zurück?",
-      a: "7 Tage inklusive heute, in 5-Minuten-Schritten. Mit der Datumsauswahl lässt sich ein bestimmter Tag betrachten.",
+      a: "7 Tage inklusive heute, in 15-Minuten-Schritten. Mit der Datumsauswahl lässt sich ein bestimmter Tag betrachten.",
     },
     {
       q: "Was enthalten die Benachrichtigungs-E-Mails?",
@@ -842,7 +842,7 @@ export const FAQ: Record<Lang, { q: string; a: string }[]> = {
     },
     {
       q: "Hoe ver terug gaat de geschiedenis?",
-      a: "7 dagen inclusief vandaag, met een granulariteit van 5 minuten. Gebruik de datumkiezer om een specifieke dag te bekijken.",
+      a: "7 dagen inclusief vandaag, met een granulariteit van 15 minuten. Gebruik de datumkiezer om een specifieke dag te bekijken.",
     },
     {
       q: "Wat bevatten de meldingsmails?",

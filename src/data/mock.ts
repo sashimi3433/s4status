@@ -3,8 +3,8 @@
 
 export type StatusCode = "operational" | "degraded" | "outage" | "nodata";
 
-/** 5-minute slots covering one day: 24h * 60 / 5 */
-export const SLOTS_PER_DAY = 288;
+/** 15-minute slots covering one day: 24h * 60 / 15 (matches check interval) */
+export const SLOTS_PER_DAY = 96;
 
 export const STATUS_OF = ["operational", "degraded", "outage", "nodata"] as const;
 
@@ -54,7 +54,7 @@ export function currentSlotOf(now: Date): number {
 }
 
 export function slotLabel(_dateStr: string, slot: number): string {
-  const minutes = slot * 5;
+  const minutes = slot * 15;
   return `${p2(Math.floor(minutes / 60))}:${p2(minutes % 60)}`;
 }
 
@@ -80,5 +80,5 @@ export function todayInTz(now: Date, offsetMin: number): string {
 /** 5-minute slot index within the viewer's current day (0–287). */
 export function slotOfDayInTz(now: Date, offsetMin: number): number {
   const shifted = (now.getTime() + offsetMin * 60_000) % 86_400_000;
-  return Math.floor(shifted / 300_000);
+  return Math.floor(shifted / 900_000);
 }

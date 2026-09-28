@@ -61,7 +61,7 @@ const EN: SpecStrings = {
     "- **Rate limit: 100 requests / minute / IP** across all `/api/*` endpoints. " +
     "Responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining` and " +
     "`X-RateLimit-Reset` headers; exceeding the limit returns `429` with `Retry-After`.\n" +
-    "- Every endpoint is checked **at least every 15 minutes**; statuses are recorded in **5-minute slots**; history covers **7 days** including today.\n" +
+    "- Every endpoint is checked **at least every 15 minutes**; statuses are recorded in **15-minute slots**; history covers **7 days** including today.\n" +
     "- `status` enum: `operational` / `degraded` / `outage` / `nodata`.",
   tagStatus: "Current status",
   tagTimeline: "Per-operation slot history",
@@ -81,8 +81,8 @@ const EN: SpecStrings = {
     "9 IAM API operations (policies), as covered by MEGA S4.",
   timelineSummary: "Per-operation status slots for one day (or one hour)",
   timelineDesc:
-    "5-minute status slots for every monitored operation — the data behind the " +
-    "timeline chart. Day view returns 288 slots per operation; hour view returns 12. " +
+    "15-minute status slots for every monitored operation — the data behind the " +
+    "timeline chart. Day view returns 96 slots per operation; hour view returns 4. " +
     "`uptime` is the operational share of the measured slots in the returned window.",
   subscribeSummary: "Subscribe an email address to incident notifications",
   subscribeDesc:
@@ -128,7 +128,7 @@ const EN: SpecStrings = {
   hdrRemaining: "Requests remaining in the current window",
   hdrReset: "Seconds until the window resets",
   retryAfter: "Seconds until the window resets",
-  statusesDesc: "One entry per 5-minute slot, in chronological order.",
+  statusesDesc: "One entry per 15-minute slot, in chronological order.",
   firstSlotDesc: "Minutes from 00:00 to the first returned slot.",
 };
 
@@ -141,7 +141,7 @@ const JA: SpecStrings = {
     "- **レートリミット: 100リクエスト / 分 / IP**(`/api/*` 全体で共通)。 " +
     "応答には `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` ヘッダーが付き、" +
     "制限超過時は `Retry-After` 付きの `429` を返します。\n" +
-    "- 各エンドポイントは**最短約15分間隔**でチェックされます。ステータスは**5分スロット**で記録され、履歴は当日を含む**7日分**です。\n" +
+    "- 各エンドポイントは**最短約15分間隔**でチェックされます。ステータスは**15分スロット**で記録され、履歴は当日を含む**7日分**です。\n" +
     "- `status` 列挙値: `operational`(正常)/ `degraded`(低下)/ `outage`(障害)/ `nodata`(データなし)。",
   tagStatus: "現在のステータス",
   tagTimeline: "操作別スロット履歴",
@@ -161,8 +161,8 @@ const JA: SpecStrings = {
     "IAM API 9操作(ポリシー)。",
   timelineSummary: "1日(または1時間)分の操作別ステータススロット",
   timelineDesc:
-    "タイムラインチャートの元データ。全監視操作の5分スロットのステータス。 " +
-    "終日ビューは操作あたり288スロット、時間ビューは12スロット。 " +
+    "タイムラインチャートの元データ。全監視操作の15分スロットのステータス。 " +
+    "終日ビューは操作あたり96スロット、時間ビューは4スロット。 " +
     "`uptime` は返却ウィンドウ内の測定スロット中 `operational` の割合です。",
   subscribeSummary: "障害通知メールの登録",
   subscribeDesc:
@@ -205,7 +205,7 @@ const JA: SpecStrings = {
   hdrRemaining: "現在のウィンドウの残りリクエスト数",
   hdrReset: "ウィンドウがリセットされるまでの秒数",
   retryAfter: "ウィンドウがリセットされるまでの秒数",
-  statusesDesc: "5分スロットごとに時系列で1エントリ。",
+  statusesDesc: "15分スロットごとに時系列で1エントリ。",
   firstSlotDesc: "00:00 から最初の返却スロットまでの分数。",
 };
 
@@ -622,8 +622,8 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
             endpoint: { type: "string", example: "all" },
             view: { type: "string", enum: ["day", "hour"] },
             hour: { type: "integer", nullable: true, example: 14 },
-            slotMinutes: { type: "integer", example: 5 },
-            slots: { type: "integer", example: 288 },
+            slotMinutes: { type: "integer", example: 15 },
+            slots: { type: "integer", example: 96 },
             firstSlotMinutes: { type: "integer", example: 0, description: s.firstSlotDesc },
             generatedAt: { type: "string", format: "date-time" },
             operations: { type: "array", items: { $ref: "#/components/schemas/TimelineRow" } },
@@ -645,7 +645,7 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
               example: 3,
               description: "Distinct operations currently failing on any affected endpoint.",
             },
-            slotMinutes: { type: "integer", example: 5 },
+            slotMinutes: { type: "integer", example: 15 },
             historyDays: { type: "integer", example: 7 },
             operationCount: { type: "integer", example: 34 },
             endpointCount: { type: "integer", example: 28 },

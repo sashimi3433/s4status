@@ -189,7 +189,7 @@ async function handleOverview(env: Env, now: Date): Promise<Response> {
     affectedEndpoints: affected.length,
     incidentMinutes,
     affectedOperations,
-    slotMinutes: 5,
+    slotMinutes: 15,
     historyDays: 7,
     operationCount: OPERATIONS.length,
     endpointCount: ENDPOINTS.length,
@@ -223,8 +223,8 @@ async function handleTimeline(url: URL, env: Env, now: Date): Promise<Response> 
       return badRequest("invalid hour: expected 0-23 or 'all'");
     }
     hour = h;
-    slotStart = h * 12;
-    slotCount = 12;
+    slotStart = h * 4;
+    slotCount = 4;
   }
 
   // Viewer timezone offset (minutes east of UTC): the returned day window is
@@ -252,9 +252,12 @@ async function handleTimeline(url: URL, env: Env, now: Date): Promise<Response> 
   );
   for (const row of results) {
     const utcMs = Date.parse(`${row.slot.replace(" ", "T")}Z`);
-    const idx = Math.floor((utcMs - startUtcMs) / 300_000);
+    const idx = Math.floor((utcMs - startUtcMs) / 900_000); // 15-min slots
+    // worst across the 3 consecutive 5-min storage slots inside this 15-min slot
     const arr = byOp.get(row.op);
-    if (arr && idx >= 0 && idx < SLOTS_PER_DAY) arr[idx] = row.worst;
+    if (arr && idx >= 0 && idx < SLOTS_PER_DAY) {
+      arr[idx] = arr[idx] === 3 ? row.worst : Math.max(arr[idx]!, row.worst);
+    }
   }
 
   const operations = OPERATIONS.map((op) => {
@@ -285,7 +288,7 @@ async function handleTimeline(url: URL, env: Env, now: Date): Promise<Response> 
     endpoint,
     view: hour === null ? "day" : "hour",
     hour,
-    slotMinutes: 5,
+    slotMinutes: 15,
     slots: slotCount,
     firstSlotMinutes: slotStart * 5,
     generatedAt: now.toISOString(),
