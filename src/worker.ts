@@ -159,7 +159,7 @@ async function handleOverview(env: Env, now: Date): Promise<Response> {
     ? "outage"
     : affected.length > 0
       ? "degraded"
-      : rows.length > 0
+      : statusMap.size > 0
         ? "operational"
         : "nodata";
 
