@@ -48,7 +48,8 @@ function crc32Base64(text: string): string {
     crc = CRC_TABLE[(crc ^ bytes[i]!) & 0xff]! ^ (crc >>> 8);
   }
   const value = (crc ^ 0xffffffff) >>> 0;
-  return btoa(String.fromCharCode(...new Uint8Array(new Uint32Array([value]).buffer)));
+  const be = [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255];
+  return btoa(String.fromCharCode(...be));
 }
 
 interface Creds {
@@ -166,32 +167,22 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
           "x-amz-copy-source": `/${b}/${PROBE_KEY}`,
         }),
       ));
-    await safe("DeleteObjects", async () => {
-      const delBody = `<Delete><Object><Key>${PROBE_KEY2}</Key></Object></Delete>`;
-      push(
-        "DeleteObjects",
-        await s3Fetch(creds, host, "POST", `/${b}`, "delete=", {
-          "x-amz-checksum-crc32": crc32Base64(delBody),
-        }, delBody),
-      );
-    });
-    await safe("DeleteObject", async () =>
-      push("DeleteObject", await s3Fetch(creds, host, "DELETE", `/${b}/${PROBE_KEY}`, "")));
-
-    // --- multipart chain ---
+    // --- multipart chain (runs before the deletes: UploadPartCopy needs
+    //     PROBE_KEY as its copy source) ---
     let uploadId = "";
     let copyUploadId = "";
+    let partEtag = "";
     await safe("CreateMultipartUpload", async () => {
       const r = await s3Fetch(creds, host, "POST", `/${b}/${MP_KEY}`, "uploads=");
       push("CreateMultipartUpload", r);
       uploadId = /<UploadId>([^<]+)<\/UploadId>/.exec(r.text)?.[1] ?? "";
     });
     if (uploadId) {
-      await safe("UploadPart", async () =>
-        push(
-          "UploadPart",
-          await s3Fetch(creds, host, "PUT", `/${b}/${MP_KEY}`, `partNumber=1&uploadId=${encodeURIComponent(uploadId)}`, {}, "part"),
-        ));
+      await safe("UploadPart", async () => {
+        const r = await s3Fetch(creds, host, "PUT", `/${b}/${MP_KEY}`, `partNumber=1&uploadId=${encodeURIComponent(uploadId)}`, {}, "part");
+        partEtag = r.headers.get("etag") ?? "";
+        push("UploadPart", r);
+      });
       await safe("ListParts", async () =>
         push("ListParts", await s3Fetch(creds, host, "GET", `/${b}/${MP_KEY}`, `uploadId=${encodeURIComponent(uploadId)}`)));
       await safe("UploadPartCopy", async () => {
@@ -204,7 +195,7 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
         push("UploadPartCopy", r);
       });
       await safe("CompleteMultipartUpload", async () => {
-        const complete = `<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>*</ETag></Part></CompleteMultipartUpload>`;
+        const complete = `<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>${partEtag || "*"}</ETag></Part></CompleteMultipartUpload>`;
         push(
           "CompleteMultipartUpload",
           await s3Fetch(creds, host, "POST", `/${b}/${MP_KEY}`, `uploadId=${encodeURIComponent(uploadId)}`, {}, complete),
@@ -217,6 +208,19 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
       await safe("AbortMultipartUpload", async () =>
         push("AbortMultipartUpload", await s3Fetch(creds, host, "DELETE", `/${b}/${MP_KEY2}`, `uploadId=${encodeURIComponent(copyUploadId)}`)));
     }
+
+    // --- deletes last (PROBE_KEY is the multipart copy source) ---
+    await safe("DeleteObjects", async () => {
+      const delBody = `<Delete><Object><Key>${PROBE_KEY2}</Key></Object></Delete>`;
+      push(
+        "DeleteObjects",
+        await s3Fetch(creds, host, "POST", `/${b}`, "delete=", {
+          "x-amz-checksum-crc32": crc32Base64(delBody),
+        }, delBody),
+      );
+    });
+    await safe("DeleteObject", async () =>
+      push("DeleteObject", await s3Fetch(creds, host, "DELETE", `/${b}/${PROBE_KEY}`, "")));
 
     // --- bucket policy cycle ---
     const policy = JSON.stringify({
