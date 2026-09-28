@@ -55,17 +55,6 @@
     opacity: 0;
   }
 }
-/* Glass-light sweep that follows the bar cascade across each row */
-@keyframes bar-sheen {
-  0% {
-    transform: translateX(-130%);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(130%);
-    opacity: 1;
-  }
-}
 /* Bars fade in one by one (day view: 2ms stagger, hour view: 35ms).
    Opacity only: scaling bars on the compositor renders them slightly soft,
    and de-promoting the layer when the animation ends visibly "sharpens"
@@ -107,25 +96,9 @@
 .anim-fade-in {
   animation: fade-in 0.35s ease backwards;
 }
-/* Day view only: sheen rides the row right after its bar cascade; opacity 0
-   at rest so the gradient band is invisible once the sweep finishes. */
-.anim-row-sheen {
-  position: relative;
-}
-.anim-row-sheen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.4) 50%,
-    transparent 70%
-  );
-  animation: bar-sheen 0.8s ease calc(var(--rd, 0ms) + 1000ms) backwards;
-}
+/* Day view only: sheen removed — on wide 15-min bars the white gradient
+   overlay visibly brightens bars as it passes, causing a color "snap" when
+   the sheen finishes and bars revert to their true colors. */
 .anim-slot-fade {
   animation: slot-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
@@ -133,8 +106,7 @@
 /* Hold the timeline cascade until it scrolls into view; Timeline.tsx removes
    this class via IntersectionObserver. Paused also freezes the delay phase,
    so bars stay invisible and the stagger starts on release. */
-.anim-hold .anim-slot-fade,
-.anim-hold .anim-row-sheen::after {
+.anim-hold .anim-slot-fade {
   animation-play-state: paused;
 }
 .anim-pop-in {

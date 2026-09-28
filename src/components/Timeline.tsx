@@ -130,10 +130,7 @@ function OpRow({
           after the cascade. Opacity-only: scaling bars on the compositor
           renders them slightly soft and de-promoting the layer at animation
           end visibly "sharpens" them. */}
-      <div
-        className="anim-row-sheen flex h-7 cursor-crosshair gap-px overflow-hidden rounded-[3px]"
-        style={{ "--rd": `${revealDelay}ms` } as CSSProperties}
-      >
+      <div className="flex h-7 cursor-crosshair gap-px overflow-hidden rounded-[3px]">
         {statuses.map((s, i) => (
           <div
             key={i}
