@@ -17,6 +17,7 @@ import {
   slotLabel,
   tzOffsetMinutes,
   uptimePercent,
+  worst,
   type StatusCode,
 } from "../data/mock";
 import { useI18n, LANG_TZ } from "../lib/i18n";
@@ -88,16 +89,23 @@ function ApiBadge({ api }: { api: "s3" | "iam" }) {
   );
 }
 
+/** 30-minute display buckets: each bar = worst status within the window.
+ *  At ~15-min check density this keeps bars readable while never hiding an
+ *  incident inside a green bucket. */
+const BUCKETS_PER_DAY = 48;
+
 function OpRow({
   op,
   statuses,
+  uptime,
   revealDelay,
 }: {
   op: Operation;
-  statuses: StatusCode[];
+  statuses: StatusCode[]; // bucketed (48 entries)
+  uptime: number | null; // slot-accurate, computed pre-bucketing
   revealDelay: number;
 }) {
-  const up = uptimePercent(statuses);
+  const up = uptime;
   const worstStatus = statuses.reduce<StatusCode>(
     (acc, s) => (s === "outage" ? "outage" : s === "degraded" && acc !== "outage" ? "degraded" : acc),
     "operational",
@@ -205,11 +213,23 @@ export default function Timeline({
         group: section.group,
         rows: section.ops.map((op) => {
           const codes = dayCodes?.get(op.id);
-          const statuses: StatusCode[] = new Array(SLOTS_PER_DAY);
+          const slots: StatusCode[] = new Array(SLOTS_PER_DAY);
           for (let i = 0; i < SLOTS_PER_DAY; i++) {
-            statuses[i] = STATUS_OF[codes ? codes[i]! : 3]!;
+            slots[i] = STATUS_OF[codes ? codes[i]! : 3]!;
           }
-          return { op, statuses };
+          const uptime = uptimePercent(slots);
+          const slotCount = SLOTS_PER_DAY / BUCKETS_PER_DAY;
+          const statuses: StatusCode[] = new Array(BUCKETS_PER_DAY);
+          for (let b = 0; b < BUCKETS_PER_DAY; b++) {
+            let acc: StatusCode = "nodata";
+            for (let i = b * slotCount; i < (b + 1) * slotCount; i++) {
+              const s = slots[i]!;
+              if (s === "nodata") continue;
+              acc = acc === "nodata" ? s : worst(acc, s);
+            }
+            statuses[b] = acc;
+          }
+          return { op, statuses, uptime };
         }),
       })),
     [dayCodes],
@@ -245,7 +265,11 @@ export default function Timeline({
       x: e.clientX,
       y: e.clientY,
       op: el.dataset.op,
-      time: slotLabel(date, Number(el.dataset.idx)),
+      time: (() => {
+        const start = Number(el.dataset.idx) * (SLOTS_PER_DAY / BUCKETS_PER_DAY);
+        const end = start + SLOTS_PER_DAY / BUCKETS_PER_DAY - 1;
+        return `${slotLabel(date, start)}\u2013${slotLabel(date, end)}`;
+      })(),
       status: el.dataset.status as StatusCode,
     });
     const track = trackRef.current;
@@ -448,6 +472,7 @@ export default function Timeline({
                           key={`${deferredEndpoint}|${deferredDate}|${row.op.id}`}
                           op={row.op}
                           statuses={row.statuses}
+                          uptime={row.uptime}
                           revealDelay={220 + (rowOffsets[si]! + ri) * 22}
                                                   />
                       ))}
