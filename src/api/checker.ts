@@ -385,12 +385,18 @@ export async function runChecks(env: Env, db: Db): Promise<void> {
 
   const now = new Date();
   const slot = slotKey(now);
-  const rows = results.map((r) => [slot, r.endpoint, r.op, r.status, r.latencyMs] as const);
-  for (const [sl, ep2, op, st, ms] of rows) {
+  const rows = results.map((r) => [slot, r.endpoint, r.op, r.status, r.latencyMs]);
+  // Single batched INSERT (bridge subrequests count toward the Workers limit)
+  if (rows.length > 0) {
+    const valuesSql = rows.map((_, i) => {
+      const b = i * 5;
+      return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5})`;
+    });
+    const params = rows.flat();
     await db.query(
-      `INSERT INTO status_slots (slot, endpoint, op, status, latency_ms) VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO status_slots (slot, endpoint, op, status, latency_ms) VALUES ${valuesSql.join(",")}
        ON CONFLICT (slot, endpoint, op) DO UPDATE SET status = EXCLUDED.status, latency_ms = EXCLUDED.latency_ms`,
-      [sl, ep2, op, st, ms],
+      params,
     );
   }
 
