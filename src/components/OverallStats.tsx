@@ -147,7 +147,7 @@ export default function OverallStats({
         {t("stats.endpoints")}
       </h2>
 
-      <div className="mt-3 space-y-5">
+      <div className="mt-6 space-y-6">
         {CITY_GROUPS.map((group, gi) => {
           const groupStatus = group.endpoints.reduce<StatusCode>(
             (acc, ep) => worst(acc, statuses.get(ep.key) ?? "operational"),
@@ -156,7 +156,7 @@ export default function OverallStats({
           return (
             <div key={group.city}>
               <div
-                className="anim-fade-in mb-2 flex items-center gap-2"
+                className="anim-fade-in mb-3 flex items-center gap-2"
                 style={{ animationDelay: `${80 + gi * 40}ms` }}
               >
                 <span className={`h-2 w-2 rounded-full ${STATUS_DOT[groupStatus]}`} />
