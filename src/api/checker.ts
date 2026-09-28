@@ -239,8 +239,13 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
     // Any non-403/non-5xx HTTP response = API operational (the service
     // processed our signed request; a 404 "NoSuchEntity" proves it works).
     const iamOk = (s: number) => s < 500 && s !== 403;
-    const pushIam = (op: string, r: { status: number; latencyMs: number }) =>
-      out.push({ endpoint: endpointKey, op, status: classify(r.status, r.latencyMs, iamOk), latencyMs: r.latencyMs });
+    const pushIam = (op: string, r: { status: number; latencyMs: number; text?: string }) => {
+      const status = classify(r.status, r.latencyMs, iamOk);
+      if (status === "outage" && diagSamples.length < 6) {
+        diagSamples.push(`${endpointKey} ${op} -> HTTP ${r.status}: ${(r.text ?? "").slice(0, 160)}`);
+      }
+      out.push({ endpoint: endpointKey, op, status, latencyMs: r.latencyMs });
+    };
 
     let policyArn = "";
     await safe("ListPolicies", async () => {
