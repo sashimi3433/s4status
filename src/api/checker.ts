@@ -272,15 +272,19 @@ async function checkEndpoint(endpointKey: string, host: string, creds: Creds): P
           pushIam("GetPolicyVersion", await iamFetch(creds, host, "GetPolicyVersion", { PolicyArn: policyArn, VersionId: versionId })));
       });
     }
-    // User policy operations — use the probe user if configured; otherwise
-    // still test with a placeholder (the API response proves health).
-    const userName = creds.probeUser || "s4status-probe";
+    // User policy operations. SAFETY: never target the admin user itself —
+    // with the fallback name the checker once detached AdministratorAccess
+    // from its own credentials ("policy keeps disappearing"). The probe
+    // user/group are dedicated, no-permission targets for attach/detach.
+    const userName = creds.probeUser || "s4status-probe-user";
     const groupName = "s4status-probe";
+    const safeTargets =
+      userName !== "s4status-probe" && !userName.includes("admin");
     await safe("ListAttachedUserPolicies", async () =>
       pushIam("ListAttachedUserPolicies", await iamFetch(creds, host, "ListAttachedUserPolicies", { UserName: userName })));
     await safe("ListAttachedGroupPolicies", async () =>
       pushIam("ListAttachedGroupPolicies", await iamFetch(creds, host, "ListAttachedGroupPolicies", { GroupName: groupName })));
-    if (policyArn) {
+    if (policyArn && safeTargets) {
       await safe("AttachUserPolicy", async () =>
         pushIam("AttachUserPolicy", await iamFetch(creds, host, "AttachUserPolicy", { PolicyArn: policyArn, UserName: userName })));
       await safe("AttachGroupPolicy", async () =>
