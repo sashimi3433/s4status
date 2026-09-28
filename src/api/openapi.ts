@@ -635,6 +635,16 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
             generatedAt: { type: "string", format: "date-time" },
             overall: { $ref: "#/components/schemas/Status" },
             affectedEndpoints: { type: "integer", example: 2 },
+            incidentMinutes: {
+              type: "integer",
+              example: 45,
+              description: "How long the current incident has been ongoing (longest affected endpoint), in minutes.",
+            },
+            affectedOperations: {
+              type: "integer",
+              example: 3,
+              description: "Distinct operations currently failing on any affected endpoint.",
+            },
             slotMinutes: { type: "integer", example: 5 },
             historyDays: { type: "integer", example: 7 },
             operationCount: { type: "integer", example: 34 },
