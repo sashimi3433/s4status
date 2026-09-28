@@ -579,6 +579,38 @@ export default {
     const url = new URL(request.url);
     const now = new Date();
 
+    // Maintenance mode: monitoring is paused; hide the stale status page.
+    if (url.pathname === "/" || url.pathname === "/privacy" || url.pathname === "/terms") {
+      return new Response(
+        `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>MEGA S4 Status (unofficial) — 一時停止中</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+           background: #09090b; color: #e4e4e7;
+           font-family: -apple-system, "Helvetica Neue", "Hiragino Sans", sans-serif; }
+    main { text-align: center; padding: 2rem; }
+    h1 { font-size: 1.4rem; }
+    p { color: #a1a1aa; }
+    a { color: #34d399; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>ただいまメンテナンス中です</h1>
+    <p>MEGA S4 Status は一時的に停止しています。ご不便をおかけして申し訳ありません。</p>
+    <p style="font-size: .85rem">Temporarily unavailable. Check back soon.</p>
+    <p style="font-size: .85rem"><a href="/docs">API documentation</a></p>
+  </main>
+</body>
+</html>`,
+        { headers: { "Content-Type": "text/html; charset=utf-8" } },
+      );
+    }
     if (url.pathname === "/docs") return docsPage(url.searchParams.get("lang"));
     if (url.pathname === "/robots.txt") {
       return new Response(
