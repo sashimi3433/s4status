@@ -15,10 +15,19 @@ import {
   STATUS_OF,
   addDays,
   slotLabel,
+  tzOffsetMinutes,
   uptimePercent,
   type StatusCode,
 } from "../data/mock";
-import { useI18n } from "../lib/i18n";
+import { useI18n, LANG_TZ, type Lang } from "../lib/i18n";
+
+function initialLang(): Lang {
+  try {
+    const q = new URLSearchParams(location.search).get("lang");
+    if (q === "ja" || q === "en" || q === "zh" || q === "ko" || q === "es" || q === "fr" || q === "de" || q === "nl") return q;
+  } catch {}
+  return navigator.language?.toLowerCase().split("-")[0] === "ja" ? "ja" : "en";
+}
 import { STATUS_BG } from "../lib/statusStyles";
 
 interface Props {
@@ -155,19 +164,21 @@ export default function Timeline({
   todayStr,
   currentSlot,
 }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [tip, setTip] = useState<Tip | null>(null);
   // Vertical highlight column snapped to the hovered 5-minute slot
   const [cross, setCross] = useState<{ left: number; width: number } | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   // "all" = full day (288 slots); "0".."23" = zoom into one hour (12 slots).
-  // Defaults to the current hour (UTC); ?hour=14 or ?hour=all overrides it.
+  // Defaults to the current hour in the UI language's timezone;
+  // ?hour=14 or ?hour=all overrides it.
   const [hour, setHour] = useState<string>(() => {
     const q = new URLSearchParams(location.search).get("hour");
     if (q === "all") return "all";
     if (q && /^[0-9]{1,2}$/.test(q) && Number(q) < 24) return String(Number(q));
-    return String(new Date().getUTCHours());
+    const off = tzOffsetMinutes(LANG_TZ[initialLang()] ?? "UTC", new Date());
+    return String(new Date(Date.now() + off * 60_000).getUTCHours());
   });
 
   // Heavy re-renders (288 bars x 34 rows) are deferred so the selects and
@@ -183,8 +194,9 @@ export default function Timeline({
     setDayCodes(null);
     (async () => {
       try {
+        const off = tzOffsetMinutes(LANG_TZ[lang] ?? "UTC", new Date());
         const res = await fetch(
-          `/api/timeline?date=${deferredDate}&endpoint=${encodeURIComponent(deferredEndpoint)}`,
+          `/api/timeline?date=${deferredDate}&endpoint=${encodeURIComponent(deferredEndpoint)}&tz=${off}`,
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
@@ -206,7 +218,7 @@ export default function Timeline({
     return () => {
       cancelled = true;
     };
-  }, [deferredDate, deferredEndpoint]);
+  }, [deferredDate, deferredEndpoint, lang]);
 
   const slotRange = useMemo(
     () =>
@@ -263,7 +275,7 @@ export default function Timeline({
       x: e.clientX,
       y: e.clientY,
       op: el.dataset.op,
-      time: `${slotLabel(date, slotRange.start + Number(el.dataset.idx))} UTC`,
+      time: slotLabel(date, slotRange.start + Number(el.dataset.idx)),
       status: el.dataset.status as StatusCode,
     });
     const track = trackRef.current;
@@ -333,7 +345,7 @@ export default function Timeline({
   const hourWindowLabel =
     deferredHour === "all"
       ? null
-      : `${deferredHour.padStart(2, "0")}:00\u2013${deferredHour.padStart(2, "0")}:59 UTC`;
+      : `${deferredHour.padStart(2, "0")}:00\u2013${deferredHour.padStart(2, "0")}:59`;
 
   return (
     <section id="timeline" className="anim-fade-up mx-auto w-full max-w-6xl scroll-mt-20 px-4 pt-10">

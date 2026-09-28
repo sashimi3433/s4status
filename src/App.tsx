@@ -6,7 +6,13 @@ import Faq from "./components/Faq";
 import SubscribeForm from "./components/SubscribeForm";
 import Footer from "./components/Footer";
 import { Privacy, Terms } from "./components/Legal";
-import { addDays, currentSlotOf, toDateStr, type StatusCode } from "./data/mock";
+import { addDays, todayInTz, slotOfDayInTz, tzOffsetMinutes, toDateStr, type StatusCode } from "./data/mock";
+import { LANG_TZ, useI18n } from "./lib/i18n";
+
+function toDateStrLocal(): string {
+  // initial state before render; recomputed properly after mount via tz
+  return toDateStr(new Date());
+}
 
 interface OverviewData {
   overall: string;
@@ -20,7 +26,7 @@ export default function App() {
   const [now, setNow] = useState(() => new Date());
   const [lastChecked] = useState(() => new Date());
   const [selectedEndpoint, setSelectedEndpoint] = useState("all");
-  const [selectedDate, setSelectedDate] = useState(() => toDateStr(new Date()));
+  const [selectedDate, setSelectedDate] = useState(() => toDateStrLocal());
   // Minimal path routing for the legal pages (everything else is query-param based)
   const [path] = useState(() => location.pathname);
 
@@ -45,8 +51,11 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const todayStr = toDateStr(now);
-  const currentSlot = currentSlotOf(now);
+  // Display "today"/current slot follow the UI language's timezone
+  const { lang } = useI18n();
+  const tzOff = useMemo(() => tzOffsetMinutes(LANG_TZ[lang] ?? "UTC", now), [lang, now]);
+  const todayStr = todayInTz(now, tzOff);
+  const currentSlot = slotOfDayInTz(now, tzOff);
   const minDate = useMemo(() => addDays(todayStr, -6), [todayStr]);
 
   // Keep the selected date inside the viewable window as days roll over.

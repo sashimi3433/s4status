@@ -102,7 +102,7 @@ async function currentStatusByEndpoint(env: Env, now: Date): Promise<Map<string,
 }
 
 async function uptimeByEndpointToday(env: Env, now: Date): Promise<Map<string, number | null>> {
-  const start = `${toDateStr(now)} 00:00`;
+  const start = slotKey(new Date(now.getTime() - 24 * 3600_000)); // trailing 24h
   const r = await env.DB.prepare(
     "SELECT endpoint, COUNT(*) AS total, SUM(status = 'operational') AS ok FROM status_slots WHERE slot >= ? GROUP BY endpoint",
   )
@@ -227,25 +227,32 @@ async function handleTimeline(url: URL, env: Env, now: Date): Promise<Response> 
     slotCount = 12;
   }
 
+  // Viewer timezone offset (minutes east of UTC): the returned day window is
+  // midnight-to-midnight in that offset. Data itself is always stored in UTC.
+  const tzRaw = Number(url.searchParams.get("tz") ?? "0");
+  const tzMin = Number.isFinite(tzRaw) ? Math.max(-840, Math.min(840, Math.round(tzRaw))) : 0;
+  const startUtcMs = Date.parse(`${date}T00:00:00Z`) - tzMin * 60_000;
+  const endUtcMs = startUtcMs + 86_400_000 - 1;
+
   await ensureStatusSchema(env);
-  const like = `${date} %`;
+  const fromSlot = slotKey(new Date(startUtcMs));
+  const toSlot = slotKey(new Date(endUtcMs));
   const query =
     endpoint === "all"
       ? env.DB.prepare(
-          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot LIKE ?1 GROUP BY slot, op`,
-        ).bind(like)
+          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot >= ?1 AND slot <= ?2 GROUP BY slot, op`,
+        ).bind(fromSlot, toSlot)
       : env.DB.prepare(
-          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot LIKE ?1 AND endpoint = ?2 GROUP BY slot, op`,
-        ).bind(like, endpoint);
+          `SELECT slot, op, MIN(${WORST_SQL}) AS worst FROM status_slots WHERE slot >= ?1 AND slot <= ?2 AND endpoint = ?3 GROUP BY slot, op`,
+        ).bind(fromSlot, toSlot, endpoint);
   const { results } = await query.all<{ slot: string; op: string; worst: number }>();
 
   const byOp = new Map<string, Uint8Array>(
     OPERATIONS.map((op) => [op.id, new Uint8Array(SLOTS_PER_DAY).fill(3)]),
   );
   for (const row of results) {
-    const hh = Number(row.slot.slice(11, 13));
-    const mm = Number(row.slot.slice(14, 16));
-    const idx = (hh * 60 + mm) / 5;
+    const utcMs = Date.parse(`${row.slot.replace(" ", "T")}Z`);
+    const idx = Math.floor((utcMs - startUtcMs) / 300_000);
     const arr = byOp.get(row.op);
     if (arr && idx >= 0 && idx < SLOTS_PER_DAY) arr[idx] = row.worst;
   }

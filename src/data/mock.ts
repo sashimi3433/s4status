@@ -57,3 +57,28 @@ export function slotLabel(_dateStr: string, slot: number): string {
   const minutes = slot * 5;
   return `${p2(Math.floor(minutes / 60))}:${p2(minutes % 60)}`;
 }
+
+/** Offset of an IANA timezone at the given instant, in minutes east of UTC. */
+export function tzOffsetMinutes(tz: string, at: Date): number {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "longOffset" });
+    const part = fmt.formatToParts(at).find((p) => p.type === "timeZoneName")?.value ?? "";
+    const m = /GMT([+-])(\d{1,2}):?(\d{2})?/.exec(part);
+    if (!m) return 0;
+    const sign = m[1] === "-" ? -1 : 1;
+    return sign * (Number(m[2]) * 60 + Number(m[3] ?? "0"));
+  } catch {
+    return 0;
+  }
+}
+
+/** "Today" (YYYY-MM-DD) as seen in a UTC+offset-minutes viewer. */
+export function todayInTz(now: Date, offsetMin: number): string {
+  return toDateStr(new Date(now.getTime() + offsetMin * 60_000));
+}
+
+/** 5-minute slot index within the viewer's current day (0–287). */
+export function slotOfDayInTz(now: Date, offsetMin: number): number {
+  const shifted = (now.getTime() + offsetMin * 60_000) % 86_400_000;
+  return Math.floor(shifted / 300_000);
+}

@@ -25,6 +25,18 @@ const LOCALES: Record<Lang, string> = {
   nl: "nl-NL",
 };
 
+/** Display timezone per UI language (data is always stored in UTC). */
+export const LANG_TZ: Record<Lang, string> = {
+  ja: "Asia/Tokyo",
+  en: "UTC",
+  zh: "Asia/Shanghai",
+  ko: "Asia/Seoul",
+  es: "Europe/Madrid",
+  fr: "Europe/Paris",
+  de: "Europe/Berlin",
+  nl: "Europe/Amsterdam",
+};
+
 function isLang(v: string | null | undefined): v is Lang {
   return !!v && LANGUAGES.some((l) => l.code === v);
 }

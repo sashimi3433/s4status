@@ -37,6 +37,7 @@ interface SpecStrings {
   paramDate: string;
   paramEndpoint: string;
   paramHour: string;
+  paramTz: string;
   emailDesc: string;
   servicesDesc: string;
   resp200: string;
@@ -116,6 +117,7 @@ const EN: SpecStrings = {
     "`all` (default) aggregates the worst status across every endpoint, " +
     "or a specific endpoint key such as `s3:ap-tokyo-1` / `iam:eu-paris-2` (see /api/endpoints).",
   paramHour: "Omit (or `all`) for the full 24h day view; `0`–`23` zooms into that hour (12 slots).",
+  paramTz: "Viewer timezone offset in minutes east of UTC (e.g. 540 for Asia/Tokyo). The returned day window is midnight-to-midnight in this offset; data is stored in UTC. Default 0.",
   emailDesc: "Email address to notify.",
   servicesDesc: "Services to subscribe to.",
   resp200: "OK",
@@ -192,6 +194,7 @@ const JA: SpecStrings = {
     "`all`(デフォルト)は全エンドポイントの最悪ステータス集約。" +
     "または特定エンドポイントキー(`s3:ap-tokyo-1` / `iam:eu-paris-2` など。/api/endpoints 参照)。",
   paramHour: "省略(または `all`)で24時間の終日ビュー。`0`〜`23` でその時間にズーム(12スロット)。",
+  paramTz: "表示タイムゾーンのUTCからのオフセット(分)(例: Asia/Tokyo は 540)。このオフセットでの0時〜24時の窓で返します。データ自体はUTCで保存されています。デフォルト 0。",
   emailDesc: "通知先メールアドレス。",
   servicesDesc: "通知対象サービス。",
   resp200: "OK",
@@ -359,6 +362,12 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
               in: "query",
               description: s.paramHour,
               schema: { type: "string", default: "all", example: "14" },
+            },
+            {
+              name: "tz",
+              in: "query",
+              description: s.paramTz,
+              schema: { type: "integer", default: 0, example: 540 },
             },
           ],
           responses: {
@@ -578,7 +587,7 @@ export function openapiSpec(lang: string | null): Record<string, unknown> {
             zone: { type: "integer", enum: [1, 2] },
             url: { type: "string", example: "s3.ap-tokyo-1.megas4.com" },
             status: { $ref: "#/components/schemas/Status" },
-            uptime24h: { type: "number", nullable: true, example: 99.98 },
+            uptime24h: { type: "number", nullable: true, example: 99.98, description: "Trailing 24 hours from now." },
           },
         },
         Operation: {
