@@ -10,15 +10,42 @@ async function sha256Hex(data: string): Promise<string> {
   return hex(await crypto.subtle.digest("SHA-256", encoder.encode(data)));
 }
 
-async function hmacHex(key: ArrayBuffer, data: string): Promise<ArrayBuffer> {
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    key,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  return crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(data));
+async function importHmacKey(raw: BufferSource): Promise<CryptoKey> {
+  return crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+}
+
+/**
+ * Derived SigV4 signing key, cached per (date, region, service). The key chain
+ * (kDate → kRegion → kService → kSigning) is constant within a UTC day, but
+ * re-deriving it per request costs 4 HMAC + 4 importKey calls — on the free
+ * plan's 10 ms CPU limit that alone was enough to kill a full checker run
+ * (outcome "exceededCpu"). Caching cuts ~13 WebCrypto calls per request to ~3.
+ */
+const signingKeys = new Map<string, Promise<CryptoKey>>();
+
+function signingKey(
+  secretAccessKey: string,
+  dateStamp: string,
+  region: string,
+  service: string,
+): Promise<CryptoKey> {
+  const cacheKey = `${dateStamp}:${region}:${service}`;
+  let p = signingKeys.get(cacheKey);
+  if (!p) {
+    p = (async () => {
+      const kDate = await crypto.subtle.sign(
+        "HMAC",
+        await importHmacKey(encoder.encode(`AWS4${secretAccessKey}`)),
+        encoder.encode(dateStamp),
+      );
+      const kRegion = await crypto.subtle.sign("HMAC", await importHmacKey(kDate), encoder.encode(region));
+      const kService = await crypto.subtle.sign("HMAC", await importHmacKey(kRegion), encoder.encode(service));
+      const kSigning = await crypto.subtle.sign("HMAC", await importHmacKey(kService), encoder.encode("aws4_request"));
+      return importHmacKey(kSigning);
+    })();
+    signingKeys.set(cacheKey, p);
+  }
+  return p;
 }
 
 export interface SigV4Params {
@@ -35,13 +62,21 @@ export interface SigV4Params {
   payloadHash?: string;
 }
 
+// RFC3986 unreserved chars (table lookup is much cheaper than a regex per char).
+const UNRESERVED = new Uint8Array(128);
+{
+  const s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  for (let i = 0; i < s.length; i++) UNRESERVED[s.charCodeAt(i)] = 1;
+}
+
 /** RFC3986 encode with unreserved chars kept, path segments slash-separated. */
 function uriEncode(value: string, encodeSlash: boolean): string {
   let out = "";
-  for (const ch of value) {
-    if (/[A-Za-z0-9\-._~]/.test(ch)) out += ch;
-    else if (ch === "/") out += encodeSlash ? "%2F" : "/";
-    else out += "%" + ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0");
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if (c < 128 && UNRESERVED[c]) out += value[i];
+    else if (c === 0x2f /* / */) out += encodeSlash ? "%2F" : "/";
+    else out += "%" + c.toString(16).toUpperCase().padStart(2, "0");
   }
   return out;
 }
@@ -96,11 +131,8 @@ export async function sigv4Headers(params: SigV4Params): Promise<Record<string, 
     await sha256Hex(canonicalRequest),
   ].join("\n");
 
-  const kDate = await hmacHex(encoder.encode(`AWS4${secretAccessKey}`).slice().buffer as ArrayBuffer, dateStamp);
-  const kRegion = await hmacHex(kDate, region);
-  const kService = await hmacHex(kRegion, service);
-  const kSigning = await hmacHex(kService, "aws4_request");
-  const signature = hex(await hmacHex(kSigning, stringToSign));
+  const key = await signingKey(secretAccessKey, dateStamp, region, service);
+  const signature = hex(await crypto.subtle.sign("HMAC", key, encoder.encode(stringToSign)));
 
   headers.authorization =
     `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${scope}, ` +

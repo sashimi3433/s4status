@@ -334,11 +334,13 @@ export async function runChecks(env: Env, db: Db): Promise<void> {
   };
 
   diagSamples.length = 0;
-  // The free plan caps a Worker invocation at ~50 subrequests, so each run
-  // checks a rotating slice (1 S3 chain ≈ 24 requests + 2 IAM chains ≈ 16)
-  // instead of the whole matrix. With a */5 cron the full 28-endpoint cycle
-  // takes ~70 min; with a per-minute cron ~14 min. Set S4_FULL_SCAN=1 on a
-  // paid plan (1000 subrequests) to check everything in one run.
+  // The free plan caps a Worker invocation at ~50 subrequests AND ~10 ms CPU,
+  // so each run checks a rotating slice — 1 S3 chain (~26 requests) + 1 IAM
+  // chain (~9). Signing keys are cached in sigv4.ts (per day/service); without
+  // that cache the per-request key derivation alone could exceed the CPU limit
+  // (outcome "exceededCpu"). With a per-minute cron the full 28-endpoint cycle
+  // takes ~14 min for both services — inside the 15-min slot granularity. Set
+  // S4_FULL_SCAN=1 on a paid plan (1000 subrequests) to check everything at once.
   const fullScan = env.S4_FULL_SCAN === "1";
   const s3List = ENDPOINTS.filter((e) => e.service === "s3");
   const iamList = ENDPOINTS.filter((e) => e.service === "iam");
@@ -356,8 +358,7 @@ export async function runChecks(env: Env, db: Db): Promise<void> {
       Number(metaRows.find((r) => r.key === k)?.value ?? 0) % len;
     const s3Cursor = read("s3cursor", s3List.length);
     const iamCursor = read("iamcursor", iamList.length);
-    slice.push(s3List[s3Cursor]!);
-    slice.push(iamList[iamCursor]!, iamList[(iamCursor + 1) % iamList.length]!);
+    slice.push(s3List[s3Cursor]!, iamList[iamCursor]!);
     includeCanary = s3Cursor === 0;
     await db.query(
       "INSERT INTO meta (key, value) VALUES ($1, $2), ($3, $4) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
@@ -365,7 +366,7 @@ export async function runChecks(env: Env, db: Db): Promise<void> {
         "s3cursor",
         String((s3Cursor + 1) % s3List.length),
         "iamcursor",
-        String((iamCursor + 2) % iamList.length),
+        String((iamCursor + 1) % iamList.length),
       ],
     );
   }
