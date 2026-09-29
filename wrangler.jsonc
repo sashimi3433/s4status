@@ -6,10 +6,11 @@
   "routes": [{ "pattern": "s4status.sessapps.com", "custom_domain": true }],
   "compatibility_date": "2026-09-25",
   "vars": {
-    "DB_BRIDGE_URL": "https://db.sessapps.com/sql"
+    "DB_BRIDGE_URL": "https://db.sessapps.com/sql",
+    "S4_IAM_PROBE_USER": "s4status-probe-user"
   },
   "triggers": {
-    "crons": []
+    "crons": ["* * * * *"]
   },
   "d1_databases": [
     {
@@ -25,6 +26,6 @@
     "binding": "ASSETS",
     // Serve the API and docs from the worker before asset lookup; otherwise
     // SPA fallback emulation intercepts navigations to /docs in dev.
-    "run_worker_first": ["/", "/privacy", "/terms", "/api/*", "/docs", "/docs/*", "/robots.txt"]
+    "run_worker_first": ["/api/*", "/docs", "/docs/*", "/robots.txt"]
   }
 }
